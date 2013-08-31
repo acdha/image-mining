@@ -70,10 +70,20 @@ def process_image(filename, output_dir=".", interactive=False,
             for line in lines[0]:
                 cv2.line(output, (line[0], line[1]), (line[2], line[3]), (0, 0, 255), 2, 4)
 
-        # TODO: make minimum contour area configurable:
+        # TODO: confirm that the min area check buys us anything over the bounding box min/max filtering
+        # TODO: make minimum contour area configurable
         min_area_pct = 0.01
         min_area = min_area_pct * source_image.size
-        print "Contour length & area (exclusion threshold: %0.2f%% == %d pixels)" % (min_area_pct, min_area)
+
+        print "Contour length & area (minimum area threshold: %0.2f%% == %d pixels)" % (min_area_pct, min_area)
+
+        # TODO: more robust algorithm for detecting likely scan edge artifacts which can handle cropped scans of large images (e.g. http://dl.wdl.org/107_1_1.png)
+        max_height = int(round(0.9 * source_image.shape[0]))
+        max_width = int(round(0.9 * source_image.shape[1]))
+        min_height = int(round(0.1 * source_image.shape[0]))
+        min_width = int(round(0.1 * source_image.shape[1]))
+        print "\tmin/max: height = %d, %d, width = %d, %d" % (min_height, max_height,
+                                                              min_width, max_width)
 
         for i, contour in enumerate(contours):
             length = cv2.arcLength(contours[i], False)
@@ -88,9 +98,8 @@ def process_image(filename, output_dir=".", interactive=False,
             x, y, w, h = cv2.boundingRect(poly)
             bbox = ((x, y), (x + w, y + h))
 
-            # TODO: more robust algorithm for detecting likely scan edge artifacts
-            if any((i - 5) < 0 for i in (x, y) + source_image.shape[0:2]):
-                print "\t%4d: skipping likely edge contour: %s" % (i, bbox)
+            if w > max_width or w < min_width or h > max_height or h < min_height:
+                print "\t%4d: failed min/max check: %s" % (i, bbox)
                 continue
 
             print "\t%4d: %16.2f%16.2f bounding box=%s" % (i, length, area, bbox)
