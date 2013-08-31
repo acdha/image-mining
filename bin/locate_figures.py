@@ -74,10 +74,10 @@ def process_image(filename):
 
             color = (randint(0, 255), randint(0, 255), randint(0, 255))
 
-            # poly = cv2.approxPolyDP(contour, 0.01 * cv2.arcLength(contour, False), False)
-            # cv2.polylines(output, contour, True, (128, 255, 128), 2)
-            # x, y, w, h = cv2.boundingRect(poly)
-            # cv2.rectangle(output, (x, y), (x + w, y + h), (128, 255, 128))
+            poly = cv2.approxPolyDP(contour, 0.01 * cv2.arcLength(contour, False), False)
+            cv2.polylines(output, contour, True, (128, 255, 128), 2)
+            x, y, w, h = cv2.boundingRect(poly)
+            cv2.rectangle(output, (x, y), (x + w, y + h), tuple(i / 2 for i in color))
 
             cv2.drawContours(output, contours, i, color, thickness=1, hierarchy=hierarchy, maxLevel=0)
 
