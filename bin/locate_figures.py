@@ -18,7 +18,7 @@ def process_image(filename):
     source_image = cv2.imread(filename)
 
     # Remove once OpenCV unbreaks window autoresizing:
-    # source_image = cv2.resize(source_image, (800, 600))
+    # source_image = cv2.resize(source_image, None, fx=0.5, fy=0.5)
 
     source_gray = cv2.cvtColor(source_image, cv.CV_BGR2GRAY)
     source_gray = cv2.medianBlur(source_gray, 7)
@@ -76,7 +76,7 @@ def process_image(filename):
             # x, y, w, h = cv2.boundingRect(poly)
             # cv2.rectangle(output, (x, y), (x + w, y + h), (128, 255, 128))
 
-            cv2.drawContours(output, contours, i, color, 1, 8, hierarchy, 0)
+            cv2.drawContours(output, contours, i, color, thickness=1, hierarchy=hierarchy, maxLevel=0)
 
         label = ["Erosion %s at %d" % (element_name, erosion_size)]
 
