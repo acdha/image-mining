@@ -23,8 +23,6 @@ def process_image(filename, output_dir=".", interactive=False,
     source_image = cv2.imread(filename)
 
     print "Processing %s (%s)" % (window_name, source_image.shape)
-    if output_dir:
-        print "\tOutput will be saved to %s" % output_dir
 
     source_gray = cv2.cvtColor(source_image, cv.CV_BGR2GRAY)
     source_gray = cv2.medianBlur(source_gray, 7)
@@ -148,6 +146,8 @@ if __name__ == "__main__":
         output_dir = os.path.realpath(args.output_directory)
         if not os.path.isdir(output_dir):
             parser.error("Output directory %s does not exist" % args.output_directory)
+        else:
+            print "Output will be saved to %s" % output_dir
 
     if output_dir is None and not args.interactive:
         parser.error("Either use --interactive or specify an output directory to save results!")
