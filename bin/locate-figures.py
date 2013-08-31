@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import argparse
 import os
 import sys
 
@@ -14,15 +15,15 @@ MORPH_TYPES = {
 MORPH_TYPE_KEYS = sorted(MORPH_TYPES.keys())
 
 
-def process_image(filename, output_dir):
+def process_image(filename, output_dir=".", interactive=False,
+                  canny_threshold=0, erosion_element=2, erosion_size=4):
+
     window_name = os.path.splitext(os.path.basename(filename))[0]
 
     source_image = cv2.imread(filename)
 
-    print "%s: %s" % (window_name, source_image.shape)
-
-    # Remove once OpenCV unbreaks window autoresizing:
-    # source_image = cv2.resize(source_image, None, fx=0.5, fy=0.5)
+    print "Processing %s (%s) output directory=%s" % (window_name, source_image.shape,
+                                                      output_dir)
 
     source_gray = cv2.cvtColor(source_image, cv.CV_BGR2GRAY)
     source_gray = cv2.medianBlur(source_gray, 7)
@@ -32,9 +33,15 @@ def process_image(filename, output_dir):
     output_base_image = cv2.bitwise_not(threshold_image)
 
     def update_output(*args):
-        canny_threshold = cv2.getTrackbarPos("Canny Threshold", window_name)
-        erosion_element = cv2.getTrackbarPos("Erosion Element", window_name)
-        erosion_size = cv2.getTrackbarPos("Erosion Size", window_name)
+        if interactive:
+            canny_threshold = cv2.getTrackbarPos("Canny Threshold", window_name)
+            erosion_element = cv2.getTrackbarPos("Erosion Element", window_name)
+            erosion_size = cv2.getTrackbarPos("Erosion Size", window_name)
+        else:
+            # FIXME: hack around Python 2 nested scoping craziness:
+            canny_threshold=0
+            erosion_element=2
+            erosion_size=4
 
         output_image = output_base_image.copy()
 
@@ -89,16 +96,16 @@ def process_image(filename, output_dir):
 
             print "\t%4d: %16.2f%16.2f bounding box=%s" % (i, length, area, bbox)
 
-            cv2.polylines(output, contour, True, tuple(i * 2 for i in color), thickness=3)
-            cv2.rectangle(output, bbox[0], bbox[1], color=color)
-
             extract_name = "%s extract %d" % (window_name, i)
-
             extracted = source_image[y:y + h, x:x + w]
-            cv2.imshow(extract_name, extracted)
-            cv2.imwrite("%s.png" % extract_name, extracted)
 
-            cv2.drawContours(output, contours, i, color, hierarchy=hierarchy, maxLevel=0)
+            cv2.imwrite(os.path.join(output_dir, "%s.png" % extract_name), extracted)
+
+            if interactive:
+                cv2.imshow(extract_name, extracted)
+                cv2.polylines(output, contour, True, tuple(i * 2 for i in color), thickness=3)
+                cv2.rectangle(output, bbox[0], bbox[1], color=color)
+                cv2.drawContours(output, contours, i, color, hierarchy=hierarchy, maxLevel=0)
 
         label = []
 
@@ -110,34 +117,49 @@ def process_image(filename, output_dir):
 
         label.append("%d contours" % len(contours))
 
-        output = cv2.copyMakeBorder(output, 40, 0, 0, 0, cv2.BORDER_CONSTANT, None, (32, 32, 32))
-        cv2.putText(output, ", ".join(label), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (192, 192, 192))
+        if interactive:
+            output = cv2.copyMakeBorder(output, 40, 0, 0, 0, cv2.BORDER_CONSTANT, None, (32, 32, 32))
+            cv2.putText(output, ", ".join(label), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (192, 192, 192))
+            cv2.imshow(window_name, output)
 
-        cv2.imshow(window_name, output)
+    if interactive:
+        cv2.namedWindow(window_name, cv2.CV_WINDOW_AUTOSIZE)
 
-    cv2.namedWindow(window_name, cv2.CV_WINDOW_AUTOSIZE)
-
-    cv2.createTrackbar("Erosion Element", window_name,
-                       2, len(MORPH_TYPES) - 1, update_output)
-    cv2.createTrackbar("Erosion Size", window_name, 4, 32, update_output)
-    cv2.createTrackbar("Canny Threshold", window_name, 0, 255, update_output)
+        cv2.createTrackbar("Erosion Element", window_name,
+                           erosion_element, len(MORPH_TYPES) - 1, update_output)
+        cv2.createTrackbar("Erosion Size", window_name, erosion_size, 32, update_output)
+        cv2.createTrackbar("Canny Threshold", window_name, canny_threshold, 255, update_output)
 
     update_output()
 
 if __name__ == "__main__":
-    try:
-        import bpdb as pdb
-    except ImportError:
-        import pdb
+    parser = argparse.ArgumentParser()
+    parser.add_argument('files', metavar="IMAGE_FILE", nargs="+")
+    parser.add_argument('--output-directory', default=".", help="Directory to store extracted files")
+    parser.add_argument('--interactive', default=False, action="store_true", help="Display visualization windows")
+    parser.add_argument('--debug', action="store_true", help="Open debugger for errors")
+    args = parser.parse_args()
 
-    for f in sys.argv[1:]:
+    output_dir = os.path.realpath(args.output_directory)
+    if not os.path.isdir(output_dir):
+        parser.error("Output directory %s does not exist" % args.output_directory)
+
+    if args.debug:
         try:
-            process_image(f, output_dir=".")
+            import bpdb as pdb
+        except ImportError:
+            import pdb
+
+    for f in args.files:
+        try:
+            process_image(f, output_dir=output_dir, interactive=args.interactive)
         except Exception as exc:
-            print >>sys.stderr, exc
-            pdb.pm()
+            if args.debug:
+                print >>sys.stderr, exc
+                pdb.pm()
             raise
 
-    while cv2.waitKey() not in (13, 27):
-        continue
+    if args.interactive:
+        while cv2.waitKey() not in (13, 27):
+            continue
     cv2.destroyAllWindows()
