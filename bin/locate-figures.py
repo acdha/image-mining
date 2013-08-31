@@ -75,15 +75,14 @@ def process_image(filename, output_dir=".", interactive=False,
         min_area_pct = 0.01
         min_area = min_area_pct * source_image.size
 
-        print "Contour length & area (minimum area threshold: %0.2f%% == %d pixels)" % (min_area_pct, min_area)
-
         # TODO: more robust algorithm for detecting likely scan edge artifacts which can handle cropped scans of large images (e.g. http://dl.wdl.org/107_1_1.png)
         max_height = int(round(0.9 * source_image.shape[0]))
         max_width = int(round(0.9 * source_image.shape[1]))
         min_height = int(round(0.1 * source_image.shape[0]))
         min_width = int(round(0.1 * source_image.shape[1]))
-        print "\tmin/max: height = %d, %d, width = %d, %d" % (min_height, max_height,
-                                                              min_width, max_width)
+
+        print "Contour length & area (min area: %d pixels, min/max box: height = %d, %d, width = %d, %d)" % (
+            min_area, min_height, max_height, min_width, max_width)
 
         for i, contour in enumerate(contours):
             length = cv2.arcLength(contours[i], False)
