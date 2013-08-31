@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from random import randint
+import os
 import sys
 
 import cv
@@ -15,6 +16,8 @@ MORPH_TYPE_KEYS = sorted(MORPH_TYPES.keys())
 
 
 def process_image(filename):
+    window_name = os.path.basename(filename)
+
     source_image = cv2.imread(filename)
 
     # Remove once OpenCV unbreaks window autoresizing:
@@ -28,9 +31,9 @@ def process_image(filename):
     output_base_image = cv2.bitwise_not(threshold_image)
 
     def update_output(*args):
-        canny_threshold = cv2.getTrackbarPos("Canny Threshold", "Output")
-        erosion_element = cv2.getTrackbarPos("Erosion Element", "Output")
-        erosion_size = cv2.getTrackbarPos("Erosion Size", "Output")
+        canny_threshold = cv2.getTrackbarPos("Canny Threshold", window_name)
+        erosion_element = cv2.getTrackbarPos("Erosion Element", window_name)
+        erosion_size = cv2.getTrackbarPos("Erosion Size", window_name)
 
         element_name = MORPH_TYPE_KEYS[erosion_element]
         element = MORPH_TYPES[element_name]
@@ -88,19 +91,16 @@ def process_image(filename):
         output = cv2.copyMakeBorder(output, 40, 0, 0, 0, cv2.BORDER_CONSTANT, None, (32, 32, 32))
         cv2.putText(output, ", ".join(label), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (192, 192, 192))
 
-        cv2.imshow("Output", output)
+        cv2.imshow(window_name, output)
 
-    cv2.namedWindow("Output", cv2.CV_WINDOW_AUTOSIZE)
+    cv2.namedWindow(window_name, cv2.CV_WINDOW_AUTOSIZE)
 
-    cv2.createTrackbar("Erosion Element", "Output",
+    cv2.createTrackbar("Erosion Element", window_name,
                        2, len(MORPH_TYPES) - 1, update_output)
-    cv2.createTrackbar("Erosion Size", "Output", 4, 32, update_output)
-    cv2.createTrackbar("Canny Threshold", "Output", 0, 255, update_output)
+    cv2.createTrackbar("Erosion Size", window_name, 4, 32, update_output)
+    cv2.createTrackbar("Canny Threshold", window_name, 0, 255, update_output)
 
     update_output()
-
-    cv2.waitKey()
-    cv2.destroyAllWindows()
 
 if __name__ == "__main__":
     try:
@@ -116,4 +116,6 @@ if __name__ == "__main__":
             pdb.pm()
             raise
 
+    while cv2.waitKey() not in (13, 27):
+        continue
     cv2.destroyAllWindows()
