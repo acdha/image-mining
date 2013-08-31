@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-from random import randint
 import os
 import sys
 
@@ -20,6 +19,8 @@ def process_image(filename):
 
     source_image = cv2.imread(filename)
 
+    print "%s: %s" % (window_name, source_image.shape)
+
     # Remove once OpenCV unbreaks window autoresizing:
     # source_image = cv2.resize(source_image, None, fx=0.5, fy=0.5)
 
@@ -35,53 +36,62 @@ def process_image(filename):
         erosion_element = cv2.getTrackbarPos("Erosion Element", window_name)
         erosion_size = cv2.getTrackbarPos("Erosion Size", window_name)
 
-        element_name = MORPH_TYPE_KEYS[erosion_element]
-        element = MORPH_TYPES[element_name]
+        output_image = output_base_image.copy()
 
-        structuring_element = cv2.getStructuringElement(element, (2 * erosion_size + 1,
-                                                                  2 * erosion_size + 1))
-        print "Erosion type %s size %d" % (element_name, erosion_size)
-        output_image = cv2.erode(output_base_image, structuring_element)
+        if erosion_size > 0:
+            element_name = MORPH_TYPE_KEYS[erosion_element]
+            element = MORPH_TYPES[element_name]
 
-        if canny_threshold == 0:
-            edges = output_image
-        else:
+            structuring_element = cv2.getStructuringElement(element, (2 * erosion_size + 1,
+                                                                      2 * erosion_size + 1))
+            print "Erosion type %s size %d" % (element_name, erosion_size)
+            output_image = cv2.erode(output_image, structuring_element)
+
+        if canny_threshold > 0:
             print "Running Canny at threshold %d" % canny_threshold
-            edges = cv2.Canny(output_image, canny_threshold, canny_threshold * 3, 12)
+            output_image = cv2.Canny(output_image, canny_threshold, canny_threshold * 3, 12)
 
         print "Finding contours...",
-        contours, hierarchy = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours, hierarchy = cv2.findContours(output_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         print " found %d" % len(contours)
 
-        # This allows us to draw in color below:
-        output = cv2.cvtColor(output_image, cv.CV_GRAY2RGB)
+        output = source_image.copy()
 
         if False:
             lines = cv2.HoughLinesP(output_base_image, rho=1, theta=cv.CV_PI / 180,
                                     threshold=160, minLineLength=80, maxLineGap=10)
 
             for line in lines[0]:
-                cv2.line(output, (line[0], line[1]), (line[2], line[3]), (0,0,255), 2, 4)
+                cv2.line(output, (line[0], line[1]), (line[2], line[3]), (0, 0, 255), 2, 4)
+
+        # TODO: make minimum contour area configurable:
+        min_area_pct = 0.01
+        min_area = min_area_pct * source_image.size
+        print "Contour length & area (exclusion threshold: %0.2f%% == %d pixels)" % (min_area_pct, min_area)
 
         for i, contour in enumerate(contours):
-            # length = cv2.arcLength(contours[i], False)
-            # area = cv2.contourArea(contours[i], False)
-            #
-            # if area < 20:
-            #     continue
-            #
-            # print "%0.2f %0.2f" % (length, area)
+            length = cv2.arcLength(contours[i], False)
+            area = cv2.contourArea(contours[i], False)
 
-            color = (randint(0, 255), randint(0, 255), randint(0, 255))
+            if area < min_area:
+                continue
+
+            print "\t%4d: %16.2f%16.2f" % (i, length, area)
+
+            color = (32, 192, 32)
 
             poly = cv2.approxPolyDP(contour, 0.01 * cv2.arcLength(contour, False), False)
-            cv2.polylines(output, contour, True, (128, 255, 128), 2)
+            cv2.polylines(output, contour, True, tuple(i * 2 for i in color), thickness=3)
+
             x, y, w, h = cv2.boundingRect(poly)
-            cv2.rectangle(output, (x, y), (x + w, y + h), tuple(i / 2 for i in color))
+            cv2.rectangle(output, (x, y), (x + w, y + h), color=color)
 
-            cv2.drawContours(output, contours, i, color, thickness=1, hierarchy=hierarchy, maxLevel=0)
+            cv2.drawContours(output, contours, i, color, hierarchy=hierarchy, maxLevel=0)
 
-        label = ["Erosion %s at %d" % (element_name, erosion_size)]
+        label = []
+
+        if erosion_size:
+            label.append("Erosion %s at %d" % (element_name, erosion_size))
 
         if canny_threshold:
             label.append("Canny at %d" % canny_threshold)
