@@ -22,8 +22,9 @@ def process_image(filename, output_dir=".", interactive=False,
 
     source_image = cv2.imread(filename)
 
-    print "Processing %s (%s) output directory=%s" % (window_name, source_image.shape,
-                                                      output_dir)
+    print "Processing %s (%s)" % (window_name, source_image.shape)
+    if output_dir:
+        print "\tOutput will be saved to %s" % output_dir
 
     source_gray = cv2.cvtColor(source_image, cv.CV_BGR2GRAY)
     source_gray = cv2.medianBlur(source_gray, 7)
@@ -99,7 +100,8 @@ def process_image(filename, output_dir=".", interactive=False,
             extract_name = "%s extract %d" % (window_name, i)
             extracted = source_image[y:y + h, x:x + w]
 
-            cv2.imwrite(os.path.join(output_dir, "%s.png" % extract_name), extracted)
+            if output_dir:
+                cv2.imwrite(os.path.join(output_dir, "%s.png" % extract_name), extracted)
 
             if interactive:
                 cv2.imshow(extract_name, extracted)
@@ -135,14 +137,20 @@ def process_image(filename, output_dir=".", interactive=False,
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('files', metavar="IMAGE_FILE", nargs="+")
-    parser.add_argument('--output-directory', default=".", help="Directory to store extracted files")
+    parser.add_argument('--output-directory', default=None, help="Directory to store extracted files")
     parser.add_argument('--interactive', default=False, action="store_true", help="Display visualization windows")
     parser.add_argument('--debug', action="store_true", help="Open debugger for errors")
     args = parser.parse_args()
 
-    output_dir = os.path.realpath(args.output_directory)
-    if not os.path.isdir(output_dir):
-        parser.error("Output directory %s does not exist" % args.output_directory)
+    if not args.output_directory:
+        output_dir = None
+    else:
+        output_dir = os.path.realpath(args.output_directory)
+        if not os.path.isdir(output_dir):
+            parser.error("Output directory %s does not exist" % args.output_directory)
+
+    if output_dir is None and not args.interactive:
+        parser.error("Either use --interactive or specify an output directory to save results!")
 
     if args.debug:
         try:
