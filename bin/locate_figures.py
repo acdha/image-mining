@@ -76,15 +76,21 @@ def process_image(filename):
             if area < min_area:
                 continue
 
-            print "\t%4d: %16.2f%16.2f" % (i, length, area)
-
             color = (32, 192, 32)
 
             poly = cv2.approxPolyDP(contour, 0.01 * cv2.arcLength(contour, False), False)
-            cv2.polylines(output, contour, True, tuple(i * 2 for i in color), thickness=3)
-
             x, y, w, h = cv2.boundingRect(poly)
-            cv2.rectangle(output, (x, y), (x + w, y + h), color=color)
+            bbox = ((x, y), (x + w, y + h))
+
+            # TODO: more robust algorithm for detecting likely scan edge artifacts
+            if any((i - 5) < 0 for i in (x, y) + source_image.shape[0:2]):
+                print "\t%4d: skipping likely edge contour: %s" % (i, bbox)
+                continue
+
+            print "\t%4d: %16.2f%16.2f bounding box=%s" % (i, length, area, bbox)
+
+            cv2.polylines(output, contour, True, tuple(i * 2 for i in color), thickness=3)
+            cv2.rectangle(output, bbox[0], bbox[1], color=color)
 
             cv2.drawContours(output, contours, i, color, hierarchy=hierarchy, maxLevel=0)
 
