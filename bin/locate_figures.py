@@ -53,6 +53,13 @@ def process_image(filename):
         # This allows us to draw in color below:
         output = cv2.cvtColor(output_image, cv.CV_GRAY2RGB)
 
+        if False:
+            lines = cv2.HoughLinesP(output_base_image, rho=1, theta=cv.CV_PI / 180,
+                                    threshold=160, minLineLength=80, maxLineGap=10)
+
+            for line in lines[0]:
+                cv2.line(output, (line[0], line[1]), (line[2], line[3]), (0,0,255), 2, 4)
+
         for i, contour in enumerate(contours):
             # length = cv2.arcLength(contours[i], False)
             # area = cv2.contourArea(contours[i], False)
