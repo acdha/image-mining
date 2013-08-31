@@ -60,6 +60,16 @@ def process_image(filename):
     cv2.destroyAllWindows()
 
 if __name__ == "__main__":
+    try:
+        import bpdb as pdb
+    except ImportError:
+        import pdb
+
     for f in sys.argv[1:]:
-        process_image(f)
+        try:
+            process_image(f)
+        except:
+            pdb.pm()
+            raise
+
     cv2.destroyAllWindows()
