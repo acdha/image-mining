@@ -111,7 +111,8 @@ if __name__ == "__main__":
     for f in sys.argv[1:]:
         try:
             process_image(f)
-        except:
+        except Exception as exc:
+            print >>sys.stderr, exc
             pdb.pm()
             raise
 
