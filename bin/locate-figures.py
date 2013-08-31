@@ -21,6 +21,8 @@ def process_image(filename, output_dir=".", interactive=False,
     window_name = os.path.splitext(os.path.basename(filename))[0]
 
     source_image = cv2.imread(filename)
+    if source_image is None:
+        raise RuntimeError("Unable to load %s" % filename)
 
     print "Processing %s (%s)" % (window_name, source_image.shape)
 
