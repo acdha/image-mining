@@ -14,8 +14,8 @@ MORPH_TYPES = {
 MORPH_TYPE_KEYS = sorted(MORPH_TYPES.keys())
 
 
-def process_image(filename):
-    window_name = os.path.basename(filename)
+def process_image(filename, output_dir):
+    window_name = os.path.splitext(os.path.basename(filename))[0]
 
     source_image = cv2.imread(filename)
 
@@ -92,6 +92,12 @@ def process_image(filename):
             cv2.polylines(output, contour, True, tuple(i * 2 for i in color), thickness=3)
             cv2.rectangle(output, bbox[0], bbox[1], color=color)
 
+            extract_name = "%s extract %d" % (window_name, i)
+
+            extracted = source_image[y:y + h, x:x + w]
+            cv2.imshow(extract_name, extracted)
+            cv2.imwrite("%s.png" % extract_name, extracted)
+
             cv2.drawContours(output, contours, i, color, hierarchy=hierarchy, maxLevel=0)
 
         label = []
@@ -126,7 +132,7 @@ if __name__ == "__main__":
 
     for f in sys.argv[1:]:
         try:
-            process_image(f)
+            process_image(f, output_dir=".")
         except Exception as exc:
             print >>sys.stderr, exc
             pdb.pm()
