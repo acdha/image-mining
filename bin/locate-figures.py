@@ -27,7 +27,7 @@ def process_image(filename, output_dir=".", interactive=False,
     print "Processing %s (%s)" % (window_name, source_image.shape)
 
     source_gray = cv2.cvtColor(source_image, cv.CV_BGR2GRAY)
-    source_gray = cv2.medianBlur(source_gray, 7)
+    # source_gray = cv2.medianBlur(source_gray, 7)
     # source_gray = cv2.blur(source_gray, (3, 3))
 
     threshold_rc, threshold_image = cv2.threshold(source_gray, 192, 255, cv2.THRESH_BINARY)
