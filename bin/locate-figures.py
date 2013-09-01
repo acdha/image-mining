@@ -127,7 +127,7 @@ def process_image(filename, output_dir=".", interactive=False,
             extracted = source_image[y:y + h, x:x + w]
 
             if output_dir:
-                cv2.imwrite(os.path.join(output_dir, "%s.png" % extract_name), extracted)
+                cv2.imwrite(os.path.join(output_dir, "%s.jpg" % extract_name), extracted)
 
             if interactive:
                 cv2.imshow(extract_name, extracted)
