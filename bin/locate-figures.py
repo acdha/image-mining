@@ -16,7 +16,8 @@ MORPH_TYPE_KEYS = sorted(MORPH_TYPES.keys())
 
 
 def process_image(filename, output_dir=".", interactive=False,
-                  canny_threshold=0, erosion_element=2, erosion_size=4):
+                  canny_threshold=0, erosion_element=2, erosion_size=4,
+                  dilation_element=2, dilation_size=4):
 
     window_name = os.path.splitext(os.path.basename(filename))[0]
 
@@ -38,13 +39,23 @@ def process_image(filename, output_dir=".", interactive=False,
             canny_threshold = cv2.getTrackbarPos("Canny Threshold", window_name)
             erosion_element = cv2.getTrackbarPos("Erosion Element", window_name)
             erosion_size = cv2.getTrackbarPos("Erosion Size", window_name)
+            dilation_element = cv2.getTrackbarPos("Dilation Element", window_name)
+            dilation_size = cv2.getTrackbarPos("Dilation Size", window_name)
         else:
             # FIXME: hack around Python 2 nested scoping craziness:
-            canny_threshold=0
-            erosion_element=2
-            erosion_size=4
+            canny_threshold = 0
+            erosion_element = 2
+            erosion_size = 0
+            dilation_element = 2
+            dilation_size = 0
 
         output_image = output_base_image.copy()
+
+        label = []
+
+        def add_label(s):
+            print "\t%s" % s
+            label.append(s)
 
         if erosion_size > 0:
             element_name = MORPH_TYPE_KEYS[erosion_element]
@@ -52,18 +63,27 @@ def process_image(filename, output_dir=".", interactive=False,
 
             structuring_element = cv2.getStructuringElement(element, (2 * erosion_size + 1,
                                                                       2 * erosion_size + 1))
-            print "Erosion type %s size %d" % (element_name, erosion_size)
+            add_label("Erosion %s at %d" % (element_name, erosion_size))
             output_image = cv2.erode(output_image, structuring_element)
 
+        if dilation_size > 0:
+            element_name = MORPH_TYPE_KEYS[dilation_element]
+            element = MORPH_TYPES[element_name]
+
+            structuring_element = cv2.getStructuringElement(element, (2 * dilation_size + 1,
+                                                                      2 * dilation_size + 1))
+            add_label("Dilation %s at %d" % (element_name, dilation_size))
+            output_image = cv2.dilate(output_image, structuring_element)
+
         if canny_threshold > 0:
-            print "Running Canny at threshold %d" % canny_threshold
+            add_label("Canny at %d" % canny_threshold)
             output_image = cv2.Canny(output_image, canny_threshold, canny_threshold * 3, 12)
 
-        print "Finding contours...",
+        print "\tFinding contours...",
         contours, hierarchy = cv2.findContours(output_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        print " found %d" % len(contours)
+        print " %d" % len(contours)
 
-        output = source_image.copy()
+        output = cv2.cvtColor(output_image, cv.CV_GRAY2RGB)
 
         if False:
             lines = cv2.HoughLinesP(output_base_image, rho=1, theta=cv.CV_PI / 180,
@@ -83,7 +103,7 @@ def process_image(filename, output_dir=".", interactive=False,
         min_height = int(round(0.1 * source_image.shape[0]))
         min_width = int(round(0.1 * source_image.shape[1]))
 
-        print "Contour length & area (min area: %d pixels, min/max box: height = %d, %d, width = %d, %d)" % (
+        print "\tContour length & area (min area: %d pixels, min/max box: height = %d, %d, width = %d, %d)" % (
             min_area, min_height, max_height, min_width, max_width)
 
         for i, contour in enumerate(contours):
@@ -93,17 +113,15 @@ def process_image(filename, output_dir=".", interactive=False,
             if area < min_area:
                 continue
 
-            color = (32, 192, 32)
-
             poly = cv2.approxPolyDP(contour, 0.01 * cv2.arcLength(contour, False), False)
             x, y, w, h = cv2.boundingRect(poly)
             bbox = ((x, y), (x + w, y + h))
 
             if w > max_width or w < min_width or h > max_height or h < min_height:
-                print "\t%4d: failed min/max check: %s" % (i, bbox)
+                print "\t\t%4d: failed min/max check: %s" % (i, bbox)
                 continue
 
-            print "\t%4d: %16.2f%16.2f bounding box=%s" % (i, length, area, bbox)
+            print "\t\t%4d: %16.2f%16.2f bounding box=%s" % (i, length, area, bbox)
 
             extract_name = "%s extract %d" % (window_name, i)
             extracted = source_image[y:y + h, x:x + w]
@@ -113,17 +131,9 @@ def process_image(filename, output_dir=".", interactive=False,
 
             if interactive:
                 cv2.imshow(extract_name, extracted)
-                cv2.polylines(output, contour, True, tuple(i * 2 for i in color), thickness=3)
-                cv2.rectangle(output, bbox[0], bbox[1], color=color)
-                cv2.drawContours(output, contours, i, color, hierarchy=hierarchy, maxLevel=0)
-
-        label = []
-
-        if erosion_size:
-            label.append("Erosion %s at %d" % (element_name, erosion_size))
-
-        if canny_threshold:
-            label.append("Canny at %d" % canny_threshold)
+                cv2.polylines(output, contour, True, (32, 192, 32), thickness=3)
+                cv2.rectangle(output, bbox[0], bbox[1], color=(32, 192, 192))
+                cv2.drawContours(output, contours, i, (32, 192, 32), hierarchy=hierarchy, maxLevel=0)
 
         label.append("%d contours" % len(contours))
 
@@ -135,10 +145,13 @@ def process_image(filename, output_dir=".", interactive=False,
     if interactive:
         cv2.namedWindow(window_name, cv2.CV_WINDOW_AUTOSIZE)
 
-        cv2.createTrackbar("Erosion Element", window_name,
-                           erosion_element, len(MORPH_TYPES) - 1, update_output)
-        cv2.createTrackbar("Erosion Size", window_name, erosion_size, 32, update_output)
         cv2.createTrackbar("Canny Threshold", window_name, canny_threshold, 255, update_output)
+        cv2.createTrackbar("Erosion Element", window_name, erosion_element, len(MORPH_TYPES) - 1,
+                           update_output)
+        cv2.createTrackbar("Erosion Size", window_name, 0, 32, update_output)
+        cv2.createTrackbar("Dilation Element", window_name, dilation_element, len(MORPH_TYPES) - 1,
+                           update_output)
+        cv2.createTrackbar("Dilation Size", window_name, 0, 32, update_output)
 
     update_output()
 
