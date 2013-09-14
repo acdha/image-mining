@@ -54,6 +54,7 @@ class FigureExtractor(object):
         self.max_width = max_width
 
     def find_figures(self, source_image):
+        assert source_image is not None, "source_image was None. Perhaps imread() failed?"
         output_image = self.filter_image(source_image)
 
         contours, hierarchy = self.find_contours(output_image)
