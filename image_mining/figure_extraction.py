@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+import logging
+
 import cv
 import cv2
 
@@ -114,14 +116,14 @@ class FigureExtractor(object):
         min_height = int(round(self.min_height * source_image.shape[0]))
         min_width = int(round(self.min_width * source_image.shape[1]))
 
-        print "\tContour length & area (area: >%d pixels, box: height >%d, <%d, width >%d, <%d)" % (
-            min_area, min_height, max_height, min_width, max_width)
+        logging.info("Contour length & area (area: >%d pixels, box: height >%d, <%d, width >%d, <%d)",
+                     min_area, min_height, max_height, min_width, max_width)
 
         for i, contour in enumerate(contours):
             area = cv2.contourArea(contours[i], False)
 
             if area < min_area:
-                print "\t\t%4d: failed area check" % (i, )
+                logging.debug("Contour %4d: failed area check", i)
                 continue
 
             poly = cv2.approxPolyDP(contour, 0.01 * cv2.arcLength(contour, False), False)
@@ -129,6 +131,7 @@ class FigureExtractor(object):
             bbox = ImageRegion(x, y, x + w, y + h, poly=poly, contour_index=i)
 
             if w > max_width or w < min_width or h > max_height or h < min_height:
-                print "\t\t%4d: failed min/max check: %s" % (i, bbox)
-            else:
-                yield bbox
+                logging.debug("Contour %4d: failed min/max check: %s", i, bbox)
+                continue
+
+            yield bbox
