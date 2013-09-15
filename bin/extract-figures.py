@@ -5,7 +5,6 @@ import json
 import os
 import sys
 
-import cv
 import cv2
 import numpy
 
@@ -49,7 +48,7 @@ def display_images(extractor, files):
 
             # The filtered image will be heavily processed down to 1-bit depth. We'll convert it to RGB
             # so we can display the effects of the filters with full-color overlays for detected figures:
-            output = cv2.cvtColor(filtered_image, cv.CV_GRAY2RGB)
+            output = cv2.cvtColor(filtered_image, cv2.COLOR_GRAY2RGB)
 
             for bbox in extractor.get_bounding_boxes_from_contours(contours, filtered_image):
                 output[bbox.image_slice] = image[bbox.image_slice]

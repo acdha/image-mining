@@ -2,8 +2,8 @@
 
 import logging
 
-import cv
 import cv2
+import numpy
 
 
 class ImageRegion(object):
@@ -80,7 +80,7 @@ class FigureExtractor(object):
     def filter_image(self, source_image):
         # TODO: Refactor this into a more reusable filter chain
 
-        output_image = cv2.cvtColor(source_image, cv.CV_BGR2GRAY)
+        output_image = cv2.cvtColor(source_image, cv2.COLOR_BGR2GRAY)
         # TODO: make blurring configurable:
         # output_image = cv2.medianBlur(output_image, 7)
         # output_image = cv2.blur(output_image, (3, 3))
@@ -112,7 +112,7 @@ class FigureExtractor(object):
 
     def detect_lines(self, source_image):
         # TODO: Make HoughLinesP a configurable option
-        lines = cv2.HoughLinesP(source_image, rho=1, theta=cv.CV_PI / 180,
+        lines = cv2.HoughLinesP(source_image, rho=1, theta=numpy.pi / 180,
                                 threshold=160, minLineLength=80, maxLineGap=10)
 
         # for line in lines[0]:
