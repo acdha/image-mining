@@ -82,13 +82,18 @@ class FigureExtractor(object):
 
         output_image = cv2.cvtColor(source_image, cv2.COLOR_BGR2GRAY)
         # TODO: make blurring configurable:
-        # output_image = cv2.medianBlur(output_image, 7)
+        # output_image = cv2.medianBlur(output_image, 5)
         # output_image = cv2.blur(output_image, (3, 3))
+        # output_image = cv2.GaussianBlur(output_image, (5, 5))
 
         # TODO: make thresholding configurable
-        # TODO: investigate automatic threshold options
-        threshold_rc, output_image = cv2.threshold(output_image, 192, 255, cv2.THRESH_BINARY)
-        output_image = cv2.bitwise_not(output_image)
+        # See http://docs.opencv.org/modules/imgproc/doc/miscellaneous_transformations.html#adaptivethreshold
+        # output_image = cv2.adaptiveThreshold(output_image, 255.0, cv2.THRESH_BINARY_INV, cv2.ADAPTIVE_THRESH_MEAN_C, 15, 5)
+        # threshold_rc, output_image = cv2.threshold(output_image, 192, 255, cv2.THRESH_BINARY_INV)
+
+        # Otsu's binarization: see http://bit.ly/194YCPp
+        output_image = cv2.GaussianBlur(output_image, (3, 3), 0)
+        threshold_rc, output_image = cv2.threshold(output_image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
         if self.erosion_size > 0:
             element_name = self.MORPH_TYPE_KEYS[self.erosion_element]
@@ -106,6 +111,7 @@ class FigureExtractor(object):
 
         if self.canny_threshold > 0:
             # TODO: Make all of Canny options configurable
+            # See http://docs.opencv.org/modules/imgproc/doc/feature_detection.html#canny
             output_image = cv2.Canny(output_image, self.canny_threshold, self.canny_threshold * 3, 12)
 
         return output_image

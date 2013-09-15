@@ -17,6 +17,8 @@ def display_images(extractor, files):
 
     images = []
     for f in files:
+        print "Loading %s" % f
+
         try:
             images.append(open_image(f))
         except StandardError as exc:
