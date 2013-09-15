@@ -5,6 +5,7 @@ from urllib import urlopen
 from urlparse import urlparse
 import os
 
+import cv
 import cv2
 import numpy
 
@@ -16,7 +17,7 @@ def open_image(file_or_url):
     """
 
     if file_or_url.startswith("http"):
-        source_image = open_image_from_url(file_or_url)
+        source_image = open_image_from_url(file_or_url, cv2_img_flag=cv.CV_LOAD_IMAGE_COLOR)
 
         url_p = urlparse(file_or_url)
 
@@ -27,7 +28,7 @@ def open_image(file_or_url):
 
         base_name = os.path.splitext(os.path.basename(file_or_url))[0]
 
-        source_image = cv2.imread(file_or_url)
+        source_image = cv2.imread(file_or_url, flags=cv.CV_LOAD_IMAGE_COLOR)
 
     if source_image is None:
         raise RuntimeError("%s could not be decoded as an image" % file_or_url)
