@@ -10,6 +10,7 @@ import cv2
 import numpy
 
 from image_mining.figure_extraction import FigureExtractor
+from image_mining.utils import open_image
 
 
 def display_images(extractor, files):
@@ -17,8 +18,11 @@ def display_images(extractor, files):
 
     images = []
     for f in files:
-        base_name = os.path.splitext(os.path.basename(f))[0]
-        images.append((base_name, cv2.imread(f)))
+        try:
+            images.append(open_image(f))
+        except StandardError as exc:
+            print >>sys.stderr, exc
+            continue
 
     def update_display(*args):
         extractor.canny_threshold = cv2.getTrackbarPos("Canny Threshold", window_name)
@@ -127,23 +131,21 @@ if __name__ == "__main__":
             display_images(extractor, args.files)
         else:
             for f in args.files:
-                if not os.path.exists(f):
-                    print >>sys.stderr, "Skipping %s: file does not exist" % f
+                try:
+                    base_name, source_image = open_image(f)
+                except StandardError as exc:
+                    print >>sys.stderr, exc
                     continue
 
-                source_image = cv2.imread(f)
-                if source_image is None:
-                    print >>sys.stderr, "Skipping %s: unable to read file" % f
-                    continue
+                output_base = os.path.join(output_dir, base_name)
 
                 print "Processing %s" % f
-                base_name = os.path.join(output_dir, os.path.splitext(os.path.basename(f))[0])
 
                 boxes = []
 
                 for i, bbox in enumerate(extractor.find_figures(source_image), 1):
                     extracted = source_image[bbox.image_slice]
-                    extract_filename = os.path.join(output_dir, "%s-%d.jpg" % (base_name, i))
+                    extract_filename = os.path.join(output_dir, "%s-%d.jpg" % (output_base, i))
                     print "\tSaving %s" % extract_filename
                     cv2.imwrite(extract_filename, extracted)
 
@@ -155,7 +157,7 @@ if __name__ == "__main__":
                                                                  "height": source_image.shape[0]}},
                                  "regions": boxes}
 
-                    json_filename = os.path.join(output_dir, "%s.json" % base_name)
+                    json_filename = os.path.join(output_dir, "%s.json" % output_base)
                     with open(json_filename, "wb") as json_f:
                         json.dump(json_data, json_f, allow_nan=False)
                     print "\tSaved extract information to %s" % json_filename
