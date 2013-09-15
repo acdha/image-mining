@@ -120,8 +120,16 @@ if __name__ == "__main__":
             display_images(extractor, args.files)
         else:
             for f in args.files:
-                print "Processing %s" % f
+                if not os.path.exists(f):
+                    print >>sys.stderr, "Skipping %s: file does not exist" % f
+                    continue
+
                 source_image = cv2.imread(f)
+                if source_image is None:
+                    print >>sys.stderr, "Skipping %s: unable to read file" % f
+                    continue
+
+                print "Processing %s" % f
                 base_name = os.path.join(output_dir, os.path.splitext(os.path.basename(f))[0])
 
                 for i, bbox in enumerate(extractor.find_figures(source_image), 1):
