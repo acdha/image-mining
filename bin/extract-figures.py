@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
+import json
 import os
 import sys
 
@@ -75,10 +76,16 @@ def display_images(extractor, files):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('files', metavar="IMAGE_FILE", nargs="+")
-    parser.add_argument('--output-directory', default=None, help="Directory to store extracted files")
-    parser.add_argument('--interactive', default=False, action="store_true", help="Display visualization windows")
+
     parser.add_argument('--debug', action="store_true", help="Open debugger for errors")
+
+    parser.add_argument('files', metavar="IMAGE_FILE", nargs="+")
+
+    mode_group = parser.add_mutually_exclusive_group(required=True)
+    mode_group.add_argument('--interactive', default=False, action="store_true", help="Display visualization windows")
+    mode_group.add_argument('--output-directory', default=None, help="Directory to store extracted files")
+
+    parser.add_argument('--save-json', action="store_true", help="Save bounding boxes as JSON files along with extracts")
 
     extraction_params = parser.add_argument_group("Extraction Parameters")
     extraction_params.add_argument('--canny-threshold', type=int, default=0, help="Canny edge detection threshold (%(type)s, default=%(default)s, 0 to disable)")
@@ -132,11 +139,26 @@ if __name__ == "__main__":
                 print "Processing %s" % f
                 base_name = os.path.join(output_dir, os.path.splitext(os.path.basename(f))[0])
 
+                boxes = []
+
                 for i, bbox in enumerate(extractor.find_figures(source_image), 1):
                     extracted = source_image[bbox.image_slice]
                     extract_filename = os.path.join(output_dir, "%s-%d.jpg" % (base_name, i))
                     print "\tSaving %s" % extract_filename
                     cv2.imwrite(extract_filename, extracted)
+
+                    boxes.append(bbox.as_dict())
+
+                if args.save_json and boxes:
+                    json_data = {"source_image": {"filename": f,
+                                                  "dimensions": {"width": source_image.shape[1],
+                                                                 "height": source_image.shape[0]}},
+                                 "regions": boxes}
+
+                    json_filename = os.path.join(output_dir, "%s.json" % base_name)
+                    with open(json_filename, "wb") as json_f:
+                        json.dump(json_data, json_f, allow_nan=False)
+                    print "\tSaved extract information to %s" % json_filename
 
     except Exception as exc:
         if args.debug:

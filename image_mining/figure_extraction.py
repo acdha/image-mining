@@ -35,6 +35,9 @@ class ImageRegion(object):
         return ((other.x1 >= self.x1) and (other.x2 <= self.x2)
                 and (other.y1 >= self.y1) and (other.y2 <= self.y2))
 
+    def as_dict(self):
+        return {"x1": self.x1, "y1": self.y1, "x2": self.x2, "y2": self.y2}
+
 
 class FigureExtractor(object):
     MORPH_TYPES = {"cross": cv2.MORPH_CROSS,
