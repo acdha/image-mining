@@ -22,9 +22,18 @@ class ImageRegion(object):
         return "({0.x1}, {0.y1})-({0.x2}, {0.y2})".format(self)
 
     @property
+    def area(self):
+        return (self.y2 - self.y1) * (self.x2 - self.x1)
+
+    @property
     def image_slice(self):
         """Return a Python slice suitable for use on an OpenCV image (i.e. numpy 2D array)"""
         return slice(self.y1, self.y2), slice(self.x1, self.x2)
+
+    def contains(self, other):
+        """Returns True if the other ImageRegion is entirely contained by this one"""
+        return ((other.x1 >= self.x1) and (other.x2 <= self.x2)
+                and (other.y1 >= self.y1) and (other.y2 <= self.y2))
 
 
 class FigureExtractor(object):
@@ -108,6 +117,17 @@ class FigureExtractor(object):
         return lines
 
     def get_bounding_boxes_from_contours(self, contours, source_image):
+        # We'll return the boxes ordered largest first to make overlaps easier to see interactively:
+        boxes = sorted(self.filter_bounding_boxes(contours, source_image), reverse=True,
+                       key=lambda i: i.area)
+
+        # This could be stored in a much more efficient structure but in testing the number
+        # of boxes is so small that it doesn't seem worth greater effort:
+        boxes = [i for i in boxes if not any(j.contains(i) for j in boxes if j is not i)]
+
+        return boxes
+
+    def filter_bounding_boxes(self, contours, source_image):
         # TODO: confirm that the min area check buys us anything over the bounding box min/max filtering
         min_area = self.min_area_percentage * source_image.size
 
