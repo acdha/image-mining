@@ -44,6 +44,9 @@ def display_images(extractor, files):
             cv2.putText(labels_img, label, (0, i * 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (192, 192, 192))
         cv2.imshow("Controls", labels_img)
 
+        print "Settings:\n\t", "\n\t".join(labels)
+        print
+
         for name, image in images:
             filtered_image = extractor.filter_image(image)
             contours, hierarchy = extractor.find_contours(filtered_image)
@@ -52,7 +55,10 @@ def display_images(extractor, files):
             # so we can display the effects of the filters with full-color overlays for detected figures:
             output = cv2.cvtColor(filtered_image, cv2.COLOR_GRAY2RGB)
 
+            print "Processing %s" % name
+
             for bbox in extractor.get_bounding_boxes_from_contours(contours, filtered_image):
+                print "\tExtract: %s" % bbox
                 output[bbox.image_slice] = image[bbox.image_slice]
 
                 cv2.polylines(output, bbox.poly, True, (32, 192, 32), thickness=3)
