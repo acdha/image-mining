@@ -26,6 +26,14 @@ class ImageRegion(object):
         return (self.y2 - self.y1) * (self.x2 - self.x1)
 
     @property
+    def height(self):
+        return self.y2 - self.y1
+
+    @property
+    def width(self):
+        return self.x2 - self.x1
+
+    @property
     def image_slice(self):
         """Return a Python slice suitable for use on an OpenCV image (i.e. numpy 2D array)"""
         return slice(self.y1, self.y2), slice(self.x1, self.x2)
@@ -34,6 +42,19 @@ class ImageRegion(object):
         """Returns True if the other ImageRegion is entirely contained by this one"""
         return ((other.x1 >= self.x1) and (other.x2 <= self.x2)
                 and (other.y1 >= self.y1) and (other.y2 <= self.y2))
+
+    def overlaps(self, other):
+        """Returns True if any part of the other ImageRegion is entirely contained by this one"""
+
+        return (((self.x1 < other.x1 < self.x2) or (self.x1 < other.x2 < self.x2))
+                and ((self.y1 < other.y1 < self.y2) or (self.y1 < other.y2 < self.y2)))
+
+    def merge(self, other):
+        """Expand this ImageRegion to contain other"""
+        self.x1 = min(self.x1, other.x1)
+        self.y1 = min(self.y1, other.y1)
+        self.x2 = max(self.x2, other.x2)
+        self.y2 = max(self.y2, other.y2)
 
     def as_dict(self):
         return {"x1": self.x1, "y1": self.y1, "x2": self.x2, "y2": self.y2}
@@ -133,6 +154,19 @@ class FigureExtractor(object):
         # This could be stored in a much more efficient structure but in testing the number
         # of boxes is so small that it doesn't seem worth greater effort:
         boxes = [i for i in boxes if not any(j.contains(i) for j in boxes if j is not i)]
+
+        restart = True
+        while restart:
+            restart = False
+            for i in boxes:
+                other_boxes = [j for j in boxes if j is not i]
+                for j in other_boxes:
+                    if j.overlaps(i):
+                        print "\tMerging overlapping extracts: %s %s" % (i, j)
+                        i.merge(j)
+                        boxes.remove(j)
+                        restart = True
+                        break
 
         return boxes
 
