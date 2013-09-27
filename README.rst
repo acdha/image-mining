@@ -7,11 +7,7 @@ Current
 -------
 
 * bin/locate-thumbnail: `find the location of a thumbnail in the source image <http://chris.improbable.org/2013/06/30/reconstructing-thumbnails-using-opencv/>`_
-
-Future Ideas
-~~~~~~~~~~~~
-
-* locate interesting non-text elements (images, figures, tables, etc.) on scanned book pages
+* bin/extract-figures: `locate interesting non-text elements (images, figures, tables, etc.) on scanned book pages <http://chris.improbable.org/2013/08/31/extracting-images-from-scanned-pages/>`_
 
 Prerequisites
 -------------
