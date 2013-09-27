@@ -9,12 +9,14 @@ complex transformations should work but may lower accuracy.
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import argparse
+import json
 import logging
 import os
-import sys
 
 import numpy
 import cv2
+
+from image_mining.utils import open_image
 
 
 def match_images(template, source):
@@ -50,17 +52,36 @@ def autorotate_image(img, corners):
                     numpy.argmin(corners_x), numpy.argmax(corners_x))
 
     if high_corners == (0, 1, 3, 1):    # 90 degrees
-        return numpy.rot90(img, 1)
+        return 90, numpy.rot90(img, 1)
     elif high_corners == (3, 0, 1, 0):  # 180 degrees
-        return cv2.flip(img, -1)
+        return 180, cv2.flip(img, -1)
     elif high_corners == (1, 3, 0, 2):  # 270 degrees
-        return numpy.rot90(img, 3)
+        return 270, numpy.rot90(img, 3)
     else:
         # Do nothing for zero-degree rotations
+        return 0, img
+
+
+def fit_image_within(img, max_height, max_width):
+    current_h, current_w = img.shape[:2]
+
+    # Confirm that we need to do anything:
+    if current_h <= max_height and current_w <= max_width:
         return img
 
+    if current_h > current_w:
+        scale = max_height / current_h
+    else:
+        scale = max_width / current_w
 
-def reconstruct_thumbnail(thumbnail_image, source_image, kp_pairs, H):
+    new_dims = (int(round(current_w * scale)), int(round(current_h * scale)))
+
+    logging.info("Resizing from %s to %s", img.shape[:2], new_dims)
+
+    return cv2.resize(img, new_dims, interpolation=cv2.INTER_AREA)
+
+
+def reconstruct_thumbnail(thumbnail_image, source_image, kp_pairs, H, downsize_reconstruction=False):
     logging.info("Reconstructing thumbnail from source image")
 
     thumb_h, thumb_w = thumbnail_image.shape[:2]
@@ -71,30 +92,24 @@ def reconstruct_thumbnail(thumbnail_image, source_image, kp_pairs, H):
 
     logging.info("Thumbnail bounds within source image: %s", corners.tolist())
 
-    corners_x, corners_y = zip(*corners)
+    corners_x, corners_y = zip(*corners.tolist())
 
-    new_thumb = source_image[min(corners_y):max(corners_y), min(corners_x):max(corners_x)]
+    new_thumb_crop = ((min(corners_y), max(corners_y)), (min(corners_x), max(corners_x)))
 
-    new_thumb = autorotate_image(new_thumb, corners)
+    new_thumb = source_image[slice(*new_thumb_crop[0]), slice(*new_thumb_crop[1])]
+
+    new_thumb_rotation, new_thumb = autorotate_image(new_thumb, corners)
 
     new_thumb_h, new_thumb_w = new_thumb.shape[:2]
-    if new_thumb_h > thumb_h or new_thumb_w > thumb_w:
-        if thumb_h > thumb_w:
-            scale = thumb_h / new_thumb_h
-        else:
-            scale = thumb_w / new_thumb_w
 
-        new_dims = (int(round(new_thumb_w * scale)), int(round(new_thumb_h * scale)))
+    if downsize_reconstruction and (new_thumb_h > thumb_h or new_thumb_w > thumb_w):
+        new_thumb = fit_image_within(new_thumb, thumb_h, thumb_w)
 
-        logging.info("Resizing from %s to %s", new_thumb.shape[:2], new_dims)
+    logging.info("Master dimensions: %s", source_image.shape)
+    logging.info("Thumbnail dimensions: %s", thumbnail_image.shape)
+    logging.info("Reconstructed thumb dimensions: %s (rotation=%d°)", new_thumb.shape, new_thumb_rotation)
 
-        new_thumb = cv2.resize(new_thumb, new_dims, interpolation=cv2.INTER_AREA)
-
-    print("Master dimensions: {}x{}".format(*source_image.shape))
-    print("Thumbnail dimensions: {}x{}".format(*thumbnail_image.shape))
-    print("Reconstructed thumb dimensions: {}x{}".format(*new_thumb.shape))
-
-    return new_thumb, corners
+    return new_thumb, new_thumb_crop, new_thumb_rotation
 
 
 def visualize_matches(source_image, original_thumbnail, reconstructed_thumbnail, corners, kp_pairs, mask):
@@ -109,12 +124,13 @@ def visualize_matches(source_image, original_thumbnail, reconstructed_thumbnail,
 
     if reconstructed_thumbnail is not None:
         # Display the reconstructed thumbnail just below the original thumbnail:
+        reconstructed_thumbnail = fit_image_within(reconstructed_thumbnail, thumb_h, thumb_w)
         reconstructed_h, reconstructed_w = reconstructed_thumbnail.shape[:2]
         vis[thumb_h:thumb_h + reconstructed_h, :reconstructed_w] = reconstructed_thumbnail
 
     if corners is not None:
         # Highlight our bounding box on the source image:
-        cv2.polylines(vis, [corners + (thumb_w, 0)], True, (255, 255, 255))
+        cv2.polylines(vis, [numpy.int32(corners) + (thumb_w, 0)], True, (255, 255, 255))
 
     thumb_points = numpy.int32([kpp[0].pt for kpp in kp_pairs])
     source_points = numpy.int32([kpp[1].pt for kpp in kp_pairs]) + (thumb_w, 0)
@@ -155,21 +171,10 @@ def find_homography(kp_pairs):
     return H, mask
 
 
-def load_image(filename):
-    if not os.path.exists(filename):
-        raise RuntimeError("%s does not exist" % filename)
-
-    img = cv2.imread(filename)
-
-    if img is None:
-        raise RuntimeError('Failed to load %s' % filename)
-
-    return img
-
-
-def locate_thumbnail(thumbnail_filename, source_filename, display=False, save_visualization=False):
-    thumbnail_image = load_image(thumbnail_filename)
-    source_image = load_image(source_filename)
+def locate_thumbnail(thumbnail_filename, source_filename, display=False, save_visualization=False,
+                     save_reconstruction=False):
+    thumbnail_basename, thumbnail_image = open_image(thumbnail_filename)
+    source_basename, source_image = open_image(source_filename)
 
     logging.info("Attempting to locate %s within %s", thumbnail_filename, source_filename)
     kp_pairs = match_images(thumbnail_image, source_image)
@@ -180,13 +185,38 @@ def locate_thumbnail(thumbnail_filename, source_filename, display=False, save_vi
 
         H, mask = find_homography(kp_pairs)
 
-        new_thumbnail, corners = reconstruct_thumbnail(thumbnail_image, source_image, kp_pairs, H)
+        new_thumbnail, corners, rotation = reconstruct_thumbnail(thumbnail_image, source_image, kp_pairs, H)
 
-        new_filename = "%s.reconstructed%s" % os.path.splitext(thumbnail_filename)
-        cv2.imwrite(new_filename, new_thumbnail)
-        logging.info("Saved reconstructed thumbnail %s", new_filename)
+        print(json.dumps({
+            "master": {
+                "source": source_filename,
+                "dimensions": {
+                    "height": source_image.shape[0],
+                    "width": source_image.shape[1],
+                }
+            },
+            "thumbnail": {
+                "source": thumbnail_filename,
+                "dimensions": {
+                    "height": thumbnail_image.shape[0],
+                    "width": thumbnail_image.shape[1],
+                }
+            },
+            "bounding_box": {
+                "height": corners[0][1] - corners[0][0],
+                "width": corners[1][1] - corners[1][0],
+                "x": corners[1][0],
+                "y": corners[0][0],
+            },
+            "rotation_degrees": rotation
+        }))
+
+        if save_reconstruction:
+            new_filename = "%s.reconstructed.jpg" % thumbnail_basename
+            cv2.imwrite(new_filename, new_thumbnail)
+            logging.info("Saved reconstructed thumbnail %s", new_filename)
     else:
-        print("Found only %d matches; skipping reconstruction" % len(kp_pairs), file=sys.stderr)
+        logging.warning("Found only %d matches; skipping reconstruction", len(kp_pairs))
         new_thumbnail = corners = H = mask = None
 
     if display or save_visualization:
@@ -209,6 +239,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('files', metavar="THUMBNAIL MASTER", nargs="+")
     parser.add_argument('--save-visualization', action="store_true", help="Save match visualization")
+    parser.add_argument('--save-thumbnail', action="store_true",
+                        help="Save reconstructed thumbnail at full size")
     parser.add_argument('--display', action="store_true", help="Display match visualization")
     parser.add_argument('--debug', action="store_true", help="Open debugger for errors")
     args = parser.parse_args()
@@ -225,8 +257,10 @@ def main():
     for i in xrange(0, len(args.files), 2):
         thumbnail = args.files[i]
         source = args.files[i + 1]
+
         try:
             locate_thumbnail(thumbnail, source, display=args.display,
+                             save_reconstruction=args.save_thumbnail,
                              save_visualization=args.save_visualization)
         except Exception as e:
             logging.error("Error processing %s %s: %s", thumbnail, source, e)
