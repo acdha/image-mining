@@ -172,7 +172,7 @@ def find_homography(kp_pairs):
 
 
 def locate_thumbnail(thumbnail_filename, source_filename, display=False, save_visualization=False,
-                     save_reconstruction=False):
+                     save_reconstruction=False, reconstruction_format="jpg"):
     thumbnail_basename, thumbnail_image = open_image(thumbnail_filename)
     source_basename, source_image = open_image(source_filename)
 
@@ -212,7 +212,7 @@ def locate_thumbnail(thumbnail_filename, source_filename, display=False, save_vi
         }))
 
         if save_reconstruction:
-            new_filename = "%s.reconstructed.jpg" % thumbnail_basename
+            new_filename = "%s.reconstructed.%s" % (thumbnail_basename, reconstruction_format)
             cv2.imwrite(new_filename, new_thumbnail)
             logging.info("Saved reconstructed thumbnail %s", new_filename)
     else:
@@ -241,12 +241,17 @@ def main():
     parser.add_argument('--save-visualization', action="store_true", help="Save match visualization")
     parser.add_argument('--save-thumbnail', action="store_true",
                         help="Save reconstructed thumbnail at full size")
+    parser.add_argument('--thumbnail-format', default='jpg',
+                        help='Format for reconstructed thumbnails (png or default %(default)s)')
     parser.add_argument('--display', action="store_true", help="Display match visualization")
     parser.add_argument('--debug', action="store_true", help="Open debugger for errors")
     args = parser.parse_args()
 
     if len(args.files) % 2 != 0:
         parser.error("Files must be provided in thumbnail and master pairs")
+
+    if args.thumbnail_format not in ('jpg', 'png'):
+        parser.error('Thumbnail format must be either jpg or png')
 
     if args.debug:
         try:
@@ -261,6 +266,7 @@ def main():
         try:
             locate_thumbnail(thumbnail, source, display=args.display,
                              save_reconstruction=args.save_thumbnail,
+                             reconstruction_format=args.thumbnail_format,
                              save_visualization=args.save_visualization)
         except Exception as e:
             logging.error("Error processing %s %s: %s", thumbnail, source, e)
