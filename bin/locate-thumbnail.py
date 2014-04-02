@@ -81,18 +81,33 @@ def fit_image_within(img, max_height, max_width):
     return cv2.resize(img, new_dims, interpolation=cv2.INTER_AREA)
 
 
-def reconstruct_thumbnail(thumbnail_image, source_image, kp_pairs, H, downsize_reconstruction=False):
+def get_scaled_corners(thumbnail_image, source_image, full_source_image, kp_pairs, H):
+    thumb_h, thumb_w = thumbnail_image.shape[:2]
+
+    corners = numpy.float32([[0, 0], [thumb_w, 0], [thumb_w, thumb_h], [0, thumb_h]])
+    corners = numpy.int32(cv2.perspectiveTransform(corners.reshape(1, -1, 2), H).reshape(-1, 2))
+    corners = corners.tolist()
+
+    logging.info("Thumbnail bounds within analyzed image: %s", corners)
+
+    if full_source_image is not None and full_source_image is not source_image:
+        scale_y = full_source_image.shape[0] / source_image.shape[0]
+        scale_x = full_source_image.shape[1] / source_image.shape[1]
+
+        corners = [(int(round(x * scale_x)), int(round(y * scale_y))) for x, y in corners]
+
+        logging.info("Thumbnail bounds within full-size source image: %s", corners)
+
+    return corners
+
+
+def reconstruct_thumbnail(thumbnail_image, source_image, corners, downsize_reconstruction=False):
     logging.info("Reconstructing thumbnail from source image")
 
     thumb_h, thumb_w = thumbnail_image.shape[:2]
     source_h, source_w = source_image.shape[:2]
 
-    corners = numpy.float32([[0, 0], [thumb_w, 0], [thumb_w, thumb_h], [0, thumb_h]])
-    corners = numpy.int32(cv2.perspectiveTransform(corners.reshape(1, -1, 2), H).reshape(-1, 2))
-
-    logging.info("Thumbnail bounds within source image: %s", corners.tolist())
-
-    corners_x, corners_y = zip(*corners.tolist())
+    corners_x, corners_y = zip(*corners)
 
     new_thumb_crop = ((min(corners_y), max(corners_y)), (min(corners_x), max(corners_x)))
 
@@ -173,11 +188,17 @@ def find_homography(kp_pairs):
 
 def locate_thumbnail(thumbnail_filename, source_filename, display=False, save_visualization=False,
                      save_reconstruction=False, reconstruction_format="jpg",
-                     json_output_filename=None):
+                     json_output_filename=None, max_master_edge=4096, max_output_edge=2048):
     thumbnail_basename, thumbnail_image = open_image(thumbnail_filename)
     source_basename, source_image = open_image(source_filename)
 
     logging.info("Attempting to locate %s within %s", thumbnail_filename, source_filename)
+
+    full_source_image = source_image
+    if max_master_edge and any(i for i in source_image.shape if i > max_master_edge):
+        logging.info("Resizing master to fit within %d pixels", max_master_edge)
+        source_image = fit_image_within(source_image, max_master_edge, max_master_edge)
+
     kp_pairs = match_images(thumbnail_image, source_image)
 
     if len(kp_pairs) >= 4:
@@ -186,7 +207,9 @@ def locate_thumbnail(thumbnail_filename, source_filename, display=False, save_vi
 
         H, mask = find_homography(kp_pairs)
 
-        new_thumbnail, corners, rotation = reconstruct_thumbnail(thumbnail_image, source_image, kp_pairs, H)
+        corners = get_scaled_corners(thumbnail_image, source_image, full_source_image, kp_pairs, H)
+
+        new_thumbnail, corners, rotation = reconstruct_thumbnail(thumbnail_image, full_source_image, corners)
 
         if json_output_filename:
             with open(json_output_filename, mode='wb') as json_file:
@@ -194,8 +217,8 @@ def locate_thumbnail(thumbnail_filename, source_filename, display=False, save_vi
                     "master": {
                         "source": source_filename,
                         "dimensions": {
-                            "height": source_image.shape[0],
-                            "width": source_image.shape[1],
+                            "height": full_source_image.shape[0],
+                            "width": full_source_image.shape[1],
                         }
                     },
                     "thumbnail": {
@@ -216,7 +239,8 @@ def locate_thumbnail(thumbnail_filename, source_filename, display=False, save_vi
 
         if save_reconstruction:
             new_filename = "%s.reconstructed.%s" % (thumbnail_basename, reconstruction_format)
-            cv2.imwrite(new_filename, new_thumbnail)
+
+            cv2.imwrite(new_filename, fit_image_within(new_thumbnail, max_output_edge, max_output_edge))
             logging.info("Saved reconstructed thumbnail %s", new_filename)
     else:
         logging.warning("Found only %d matches; skipping reconstruction", len(kp_pairs))
@@ -248,6 +272,11 @@ def main():
                         help="Save JSON file with thumbnail crop information")
     parser.add_argument('--thumbnail-format', default='jpg',
                         help='Format for reconstructed thumbnails (png or default %(default)s)')
+    parser.add_argument('--fit-master-within', type=int, default=8192,
+                        help="Resize master so the largest edge is below the specified value "
+                             "(faster but possibly less accurate)")
+    parser.add_argument('--fit-output-within', type=int, default=2048,
+                        help="Resize output so the largest edge is below the specified value")
     parser.add_argument('--display', action="store_true", help="Display match visualization")
     parser.add_argument('--debug', action="store_true", help="Open debugger for errors")
     args = parser.parse_args()
@@ -278,7 +307,9 @@ def main():
                              save_reconstruction=args.save_thumbnail,
                              reconstruction_format=args.thumbnail_format,
                              save_visualization=args.save_visualization,
-                             json_output_filename=json_output_filename)
+                             json_output_filename=json_output_filename,
+                             max_master_edge=args.fit_master_within,
+                             max_output_edge=args.fit_output_within)
         except Exception as e:
             logging.error("Error processing %s %s: %s", thumbnail, source, e)
             if args.debug:
