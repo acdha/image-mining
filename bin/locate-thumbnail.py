@@ -77,7 +77,8 @@ def fit_image_within(img, max_height, max_width):
 
     new_dims = (int(round(current_w * scale)), int(round(current_h * scale)))
 
-    logging.info("Resizing from %s to %s", img.shape[:2], new_dims)
+    # Note the flip from numpy's .shape to opencv's (x, y) format:
+    logging.info('Resizing from %s to %s', (current_w, current_h), new_dims)
 
     return cv2.resize(img, new_dims, interpolation=cv2.INTER_AREA)
 
