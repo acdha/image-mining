@@ -15,6 +15,7 @@ import os
 
 import numpy
 import cv2
+import cv
 
 from image_mining.utils import open_image
 
@@ -244,6 +245,7 @@ def locate_thumbnail(thumbnail_filename, source_filename, display=False, save_vi
             logging.info("Saved reconstructed thumbnail %s", new_filename)
     else:
         logging.warning("Found only %d matches; skipping reconstruction", len(kp_pairs))
+        title = "MATCH FAILED: %d pairs" % len(kp_pairs)
         new_thumbnail = corners = H = mask = None
 
     if display or save_visualization:
@@ -255,7 +257,11 @@ def locate_thumbnail(thumbnail_filename, source_filename, display=False, save_vi
         logging.info("Saved match visualization %s", vis_filename)
 
     if display:
-        cv2.imshow(title, vis_image)
+        # This may or may not exist depending on whether OpenCV was compiled using the QT backend:
+        window_flags = getattr(cv, 'CV_WINDOW_NORMAL', cv.CV_WINDOW_AUTOSIZE)
+        window_title = '%s - %s' % (thumbnail_basename, title)
+        cv2.namedWindow(window_title, flags=window_flags)
+        cv2.imshow(window_title, vis_image)
         cv2.waitKey()
         cv2.destroyAllWindows()
 
