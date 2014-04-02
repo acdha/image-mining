@@ -172,7 +172,8 @@ def find_homography(kp_pairs):
 
 
 def locate_thumbnail(thumbnail_filename, source_filename, display=False, save_visualization=False,
-                     save_reconstruction=False, reconstruction_format="jpg"):
+                     save_reconstruction=False, reconstruction_format="jpg",
+                     json_output_filename=None):
     thumbnail_basename, thumbnail_image = open_image(thumbnail_filename)
     source_basename, source_image = open_image(source_filename)
 
@@ -187,29 +188,31 @@ def locate_thumbnail(thumbnail_filename, source_filename, display=False, save_vi
 
         new_thumbnail, corners, rotation = reconstruct_thumbnail(thumbnail_image, source_image, kp_pairs, H)
 
-        print(json.dumps({
-            "master": {
-                "source": source_filename,
-                "dimensions": {
-                    "height": source_image.shape[0],
-                    "width": source_image.shape[1],
-                }
-            },
-            "thumbnail": {
-                "source": thumbnail_filename,
-                "dimensions": {
-                    "height": thumbnail_image.shape[0],
-                    "width": thumbnail_image.shape[1],
-                }
-            },
-            "bounding_box": {
-                "height": corners[0][1] - corners[0][0],
-                "width": corners[1][1] - corners[1][0],
-                "x": corners[1][0],
-                "y": corners[0][0],
-            },
-            "rotation_degrees": rotation
-        }))
+        if json_output_filename:
+            with open(json_output_filename, mode='wb') as json_file:
+                json.dump({
+                    "master": {
+                        "source": source_filename,
+                        "dimensions": {
+                            "height": source_image.shape[0],
+                            "width": source_image.shape[1],
+                        }
+                    },
+                    "thumbnail": {
+                        "source": thumbnail_filename,
+                        "dimensions": {
+                            "height": thumbnail_image.shape[0],
+                            "width": thumbnail_image.shape[1],
+                        }
+                    },
+                    "bounding_box": {
+                        "height": corners[0][1] - corners[0][0],
+                        "width": corners[1][1] - corners[1][0],
+                        "x": corners[1][0],
+                        "y": corners[0][0],
+                    },
+                    "rotation_degrees": rotation
+                }, json_file, indent=4)
 
         if save_reconstruction:
             new_filename = "%s.reconstructed.%s" % (thumbnail_basename, reconstruction_format)
@@ -241,6 +244,8 @@ def main():
     parser.add_argument('--save-visualization', action="store_true", help="Save match visualization")
     parser.add_argument('--save-thumbnail', action="store_true",
                         help="Save reconstructed thumbnail at full size")
+    parser.add_argument('--save-json', action="store_true",
+                        help="Save JSON file with thumbnail crop information")
     parser.add_argument('--thumbnail-format', default='jpg',
                         help='Format for reconstructed thumbnails (png or default %(default)s)')
     parser.add_argument('--display', action="store_true", help="Display match visualization")
@@ -263,11 +268,17 @@ def main():
         thumbnail = args.files[i]
         source = args.files[i + 1]
 
+        if args.save_json:
+            json_output_filename = '%s.json' % os.path.splitext(thumbnail)[0]
+        else:
+            json_output_filename = None
+
         try:
             locate_thumbnail(thumbnail, source, display=args.display,
                              save_reconstruction=args.save_thumbnail,
                              reconstruction_format=args.thumbnail_format,
-                             save_visualization=args.save_visualization)
+                             save_visualization=args.save_visualization,
+                             json_output_filename=json_output_filename)
         except Exception as e:
             logging.error("Error processing %s %s: %s", thumbnail, source, e)
             if args.debug:
