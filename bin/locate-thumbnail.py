@@ -295,10 +295,7 @@ def main():
         parser.error('Thumbnail format must be either jpg or png')
 
     if args.debug:
-        try:
-            import bpdb as pdb
-        except ImportError:
-            import pdb
+        import pdb
 
     for i in xrange(0, len(args.files), 2):
         thumbnail = args.files[i]
@@ -320,7 +317,8 @@ def main():
         except Exception as e:
             logging.error("Error processing %s %s: %s", thumbnail, source, e)
             if args.debug:
-                pdb.pm()
+                pdb.post_mortem()
+            raise
 
 
 if __name__ == '__main__':
