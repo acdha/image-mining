@@ -12,6 +12,7 @@ import argparse
 import json
 import logging
 import os
+import sys
 
 import numpy
 import cv2
@@ -318,7 +319,7 @@ def main():
             logging.error("Error processing %s %s: %s", thumbnail, source, e)
             if args.debug:
                 pdb.post_mortem()
-            raise
+            sys.exit(1)
 
 
 if __name__ == '__main__':
