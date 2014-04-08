@@ -133,9 +133,13 @@ def reconstruct_thumbnail(thumbnail_image, source_image, corners, downsize_recon
     if downsize_reconstruction and (new_thumb_h > thumb_h or new_thumb_w > thumb_w):
         new_thumb = fit_image_within(new_thumb, thumb_h, thumb_w)
 
-    logging.info("Master dimensions: %s", source_image.shape)
-    logging.info("Thumbnail dimensions: %s", thumbnail_image.shape)
-    logging.info("Reconstructed thumb dimensions: %s (rotation=%d°)", new_thumb.shape, new_thumb_rotation)
+    logging.info('Master dimensions: width=%s, height=%s', source_image.shape[1], source_image.shape[0])
+    logging.info('Thumbnail dimensions: width=%s, height=%s (aspect ratio: %0.3f)',
+                 thumbnail_image.shape[1], thumbnail_image.shape[0],
+                 thumbnail_image.shape[0] / thumbnail_image.shape[1])
+    logging.info('Reconstructed thumb dimensions: width=%s, height=%s (rotation=%d°, aspect ratio: %0.3f)',
+                 new_thumb.shape[1], new_thumb.shape[0],
+                 new_thumb_rotation, new_thumb.shape[0] / new_thumb.shape[1])
 
     return new_thumb, new_thumb_crop, new_thumb_rotation
 
