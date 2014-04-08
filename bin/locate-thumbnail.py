@@ -89,6 +89,16 @@ def get_scaled_corners(thumbnail_image, source_image, full_source_image, kp_pair
 
     corners = numpy.float32([[0, 0], [thumb_w, 0], [thumb_w, thumb_h], [0, thumb_h]])
     corners = numpy.int32(cv2.perspectiveTransform(corners.reshape(1, -1, 2), H).reshape(-1, 2))
+
+    # It's possible for rounding errors to produce values which are slightly outside of the image dimensions
+    # so we'll clamp the boundaries within the source image: https://github.com/acdha/image-mining/issues/5
+    source_h, source_w = source_image.shape[:2]
+
+    # Transpose the array so we can operate on it *in-place* to clamp values:
+    corners_x, corners_y = corners.T
+    numpy.clip(corners_x, 0.0, source_w, out=corners_x)
+    numpy.clip(corners_y, 0.0, source_h, out=corners_y)
+
     corners = corners.tolist()
 
     logging.info("Thumbnail bounds within analyzed image: %s", corners)
