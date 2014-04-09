@@ -50,17 +50,18 @@ def filter_matches(kp1, kp2, matches, ratio=0.75):
 
 def autorotate_image(img, corners):
     corners_x, corners_y = zip(*corners)
-    high_corners = (numpy.argmin(corners_y), numpy.argmax(corners_y),
-                    numpy.argmin(corners_x), numpy.argmax(corners_x))
 
-    if high_corners == (0, 1, 3, 1) or high_corners == (3, 1, 2, 1):    # 90 degrees
-        return 90, numpy.rot90(img, 1)
-    elif high_corners == (3, 0, 1, 0):  # 180 degrees
+    # n.b. numpy rot90 rotates 90° counter-clockwise but our terminology is clockwise
+    #      so the rotations below aren't actually flippy:
+
+    if (((min(corners_x[0], corners_x[1]) > max(corners_x[2], corners_x[3]))
+         and min(corners_y[1], corners_y[2]) > max(corners_y[0], corners_y[3]))):
+        return 270, numpy.rot90(img)
+    elif min(corners_x[0], corners_y[1]) > max(corners_x[2], corners_x[3]):
+        return 90, numpy.rot90(img, 3)
+    elif min(corners_x[0], corners_x[3]) > max(corners_x[1], corners_x[2]):
         return 180, cv2.flip(img, -1)
-    elif high_corners == (2, 0, 1, 3):  # 270 degrees
-        return 270, numpy.rot90(img, 3)
     else:
-        # Do nothing for zero-degree rotations
         return 0, img
 
 
