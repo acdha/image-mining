@@ -216,6 +216,7 @@ def locate_thumbnail(thumbnail_filename, source_filename, display=False, save_vi
         logging.info("Resizing master to fit within %d pixels", max_master_edge)
         source_image = fit_image_within(source_image, max_master_edge, max_master_edge)
 
+    logging.info('Finding common features')
     kp_pairs = match_images(thumbnail_image, source_image)
 
     if len(kp_pairs) >= 4:
