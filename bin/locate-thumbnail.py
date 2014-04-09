@@ -114,7 +114,8 @@ def get_scaled_corners(thumbnail_image, source_image, full_source_image, kp_pair
     return corners
 
 
-def reconstruct_thumbnail(thumbnail_image, source_image, corners, downsize_reconstruction=False):
+def reconstruct_thumbnail(thumbnail_image, source_image, corners, downsize_reconstruction=False,
+                          max_aspect_ratio_delta=0.1):
     logging.info("Reconstructing thumbnail from source image")
 
     thumb_h, thumb_w = thumbnail_image.shape[:2]
@@ -133,13 +134,18 @@ def reconstruct_thumbnail(thumbnail_image, source_image, corners, downsize_recon
     if downsize_reconstruction and (new_thumb_h > thumb_h or new_thumb_w > thumb_w):
         new_thumb = fit_image_within(new_thumb, thumb_h, thumb_w)
 
+    old_aspect_ratio = thumbnail_image.shape[0] / thumbnail_image.shape[1]
+    new_aspect_ratio = new_thumb.shape[0] / new_thumb.shape[1]
     logging.info('Master dimensions: width=%s, height=%s', source_image.shape[1], source_image.shape[0])
     logging.info('Thumbnail dimensions: width=%s, height=%s (aspect ratio: %0.3f)',
                  thumbnail_image.shape[1], thumbnail_image.shape[0],
-                 thumbnail_image.shape[0] / thumbnail_image.shape[1])
+                 old_aspect_ratio)
     logging.info('Reconstructed thumb dimensions: width=%s, height=%s (rotation=%d°, aspect ratio: %0.3f)',
                  new_thumb.shape[1], new_thumb.shape[0],
-                 new_thumb_rotation, new_thumb.shape[0] / new_thumb.shape[1])
+                 new_thumb_rotation, new_aspect_ratio)
+
+    if abs(old_aspect_ratio - new_aspect_ratio) > max_aspect_ratio_delta:
+        raise RuntimeError('Aspect ratios are significantly different – reconstruction likely failed!')
 
     return new_thumb, new_thumb_crop, new_thumb_rotation
 
@@ -205,6 +211,7 @@ def find_homography(kp_pairs):
 
 def locate_thumbnail(thumbnail_filename, source_filename, display=False, save_visualization=False,
                      save_reconstruction=False, reconstruction_format="jpg",
+                     max_aspect_ratio_delta=0.1,
                      json_output_filename=None, max_master_edge=4096, max_output_edge=2048):
     thumbnail_basename, thumbnail_image = open_image(thumbnail_filename)
     source_basename, source_image = open_image(source_filename)
@@ -227,7 +234,8 @@ def locate_thumbnail(thumbnail_filename, source_filename, display=False, save_vi
 
         corners = get_scaled_corners(thumbnail_image, source_image, full_source_image, kp_pairs, H)
 
-        new_thumbnail, corners, rotation = reconstruct_thumbnail(thumbnail_image, full_source_image, corners)
+        new_thumbnail, corners, rotation = reconstruct_thumbnail(thumbnail_image, full_source_image, corners,
+                                                                 max_aspect_ratio_delta=max_aspect_ratio_delta)
 
         if json_output_filename:
             with open(json_output_filename, mode='wb') as json_file:
@@ -329,7 +337,8 @@ def main():
                              save_visualization=args.save_visualization,
                              json_output_filename=json_output_filename,
                              max_master_edge=args.fit_master_within,
-                             max_output_edge=args.fit_output_within)
+                             max_output_edge=args.fit_output_within,
+                             max_aspect_ratio_delta=args.max_aspect_ratio_delta)
         except Exception as e:
             logging.error("Error processing %s %s: %s", thumbnail, source, e)
             if args.debug:
