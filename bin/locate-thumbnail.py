@@ -211,7 +211,7 @@ def find_homography(kp_pairs):
 
 def locate_thumbnail(thumbnail_filename, source_filename, display=False, save_visualization=False,
                      save_reconstruction=False, reconstruction_format="jpg",
-                     max_aspect_ratio_delta=0.1,
+                     max_aspect_ratio_delta=0.1, minimum_matches=10,
                      json_output_filename=None, max_master_edge=4096, max_output_edge=2048):
     thumbnail_basename, thumbnail_image = open_image(thumbnail_filename)
     source_basename, source_image = open_image(source_filename)
@@ -226,7 +226,7 @@ def locate_thumbnail(thumbnail_filename, source_filename, display=False, save_vi
     logging.info('Finding common features')
     kp_pairs = match_images(thumbnail_image, source_image)
 
-    if len(kp_pairs) >= 4:
+    if len(kp_pairs) >= minimum_matches:
         title = "Found %d matches" % len(kp_pairs)
         logging.info(title)
 
@@ -308,6 +308,11 @@ def main():
                              "(faster but possibly less accurate)")
     parser.add_argument('--fit-output-within', type=int, default=2048,
                         help="Resize output so the largest edge is below the specified value")
+    parser.add_argument('--minimum-matches', type=int, default=20,
+                        help='Require at least this many features for a match (default %(default)s)')
+    parser.add_argument('--max-aspect-ratio-delta', type=float, default=0.1,
+                        help='Raise an error if the reconstructed image\'s aspect ratio differs by more than '
+                             'this percentage default %(default)s)')
     parser.add_argument('--display', action="store_true", help="Display match visualization")
     parser.add_argument('--debug', action="store_true", help="Open debugger for errors")
     args = parser.parse_args()
@@ -338,7 +343,8 @@ def main():
                              json_output_filename=json_output_filename,
                              max_master_edge=args.fit_master_within,
                              max_output_edge=args.fit_output_within,
-                             max_aspect_ratio_delta=args.max_aspect_ratio_delta)
+                             max_aspect_ratio_delta=args.max_aspect_ratio_delta,
+                             minimum_matches=args.minimum_matches)
         except Exception as e:
             logging.error("Error processing %s %s: %s", thumbnail, source, e)
             if args.debug:
