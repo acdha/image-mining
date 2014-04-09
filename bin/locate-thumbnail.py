@@ -57,7 +57,7 @@ def autorotate_image(img, corners):
         return 90, numpy.rot90(img, 1)
     elif high_corners == (3, 0, 1, 0):  # 180 degrees
         return 180, cv2.flip(img, -1)
-    elif high_corners == (1, 3, 0, 2):  # 270 degrees
+    elif high_corners == (2, 0, 1, 3):  # 270 degrees
         return 270, numpy.rot90(img, 3)
     else:
         # Do nothing for zero-degree rotations
