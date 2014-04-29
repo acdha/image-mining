@@ -147,6 +147,9 @@ def reconstruct_thumbnail(thumbnail_image, source_image, corners, downsize_recon
     if abs(old_aspect_ratio - new_aspect_ratio) > max_aspect_ratio_delta:
         raise RuntimeError('Aspect ratios are significantly different – reconstruction likely failed!')
 
+    if (new_thumb_h <= thumb_h) or (new_thumb_w <= thumb_w):
+        raise RuntimeError("Reconstructed thumbnail wasn't larger than the original!")
+
     return new_thumb, new_thumb_crop, new_thumb_rotation
 
 
