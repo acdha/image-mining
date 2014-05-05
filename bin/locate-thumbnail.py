@@ -220,6 +220,11 @@ def locate_thumbnail(thumbnail_filename, source_filename, display=False, save_vi
     thumbnail_basename, thumbnail_image = open_image(thumbnail_filename)
     source_basename, source_image = open_image(source_filename)
 
+    if (((source_image.shape[0] <= thumbnail_image.shape[0])
+         or (source_image.shape[1] <= thumbnail_image.shape[1]))):
+        raise RuntimeError("Master file wasn't larger than the thumbnail: %r vs %r" % (source_image.shape,
+                                                                                       thumbnail_image.shape))
+
     logging.info("Attempting to locate %s within %s", thumbnail_filename, source_filename)
 
     full_source_image = source_image
