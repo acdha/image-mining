@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='image-mining',
-      version='0.1.3',
+      version='0.1.4',
       author='Chris Adams',
       author_email='chris@improbable.org',
       packages=['image_mining'],
