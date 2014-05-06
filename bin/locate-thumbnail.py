@@ -138,7 +138,7 @@ def adjust_crop_aspect_ratio(cropbox, target_aspect_ratio, original_height=0, or
     else:
         scale = original_width / new_crop_width
 
-    logging.info('Original crop box: %r (%0.4f)', cropbox, target_aspect_ratio)
+    logging.info('Original crop box: %r (%0.4f)', cropbox, new_crop_height / new_crop_width)
 
     delta_y = (original_height / scale) - new_crop_height
     delta_x = (original_width / scale) - new_crop_width
@@ -146,13 +146,15 @@ def adjust_crop_aspect_ratio(cropbox, target_aspect_ratio, original_height=0, or
     logging.debug('Crop box deltas: %0.1f x, %0.1f y', delta_x, delta_y)
 
     if delta_y != 0:
-        cropbox[0] = clamp_values(delta=delta_y, max_value=max_height, *cropbox[0])
+        new_crop_y = clamp_values(delta=delta_y, max_value=max_height, *cropbox[0])
 
     if delta_x != 0:
-        cropbox[1] = clamp_values(delta=delta_x, max_value=max_width, *cropbox[1])
+        new_crop_x = clamp_values(delta=delta_x, max_value=max_width, *cropbox[1])
+
+    cropbox = (new_crop_y, new_crop_x)
 
     logging.info('Updated crop box: %r (%0.4f)', cropbox,
-                 (cropbox[0][1] - cropbox[0][0]) / (cropbox[1][1] - cropbox[1][0]))
+                 (new_crop_y[1] - new_crop_y[0]) / (new_crop_x[1] - new_crop_x[0]))
 
     return cropbox
 
