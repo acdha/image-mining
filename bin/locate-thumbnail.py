@@ -6,7 +6,8 @@ Detect the crop box for a thumbnail inside a larger image
 The thumbnail image can be cropped and scaled arbitrarily from the larger image. Rotation and other more
 complex transformations should work but may lower accuracy.
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
 
 import argparse
 import json
@@ -14,10 +15,9 @@ import logging
 import os
 import sys
 
-import numpy
-import cv2
 import cv
-
+import cv2
+import numpy
 from image_mining.utils import open_image
 
 
@@ -115,35 +115,120 @@ def get_scaled_corners(thumbnail_image, source_image, full_source_image, kp_pair
     return corners
 
 
+def adjust_crop_aspect_ratio(cropbox, target_aspect_ratio, original_height=0, original_width=0,
+                             max_height=0, max_width=0):
+
+    new_crop_y, new_crop_x = cropbox
+    new_crop_height = (new_crop_y[1] - new_crop_y[0])
+    new_crop_width = (new_crop_x[1] - new_crop_x[0])
+    new_aspect_ratio = new_crop_height / new_crop_width
+
+    # TODO: check pixel coordinates at the output precision level to ignore floating point noise:
+    if target_aspect_ratio == new_aspect_ratio:
+        return cropbox
+
+    logging.info('Adjusting reconstruction to match original %0.4f aspect ratio', target_aspect_ratio)
+
+    # The basic idea is that we'll adjust the crop's short axis up or down to match the input aspect
+    # ratio. To avoid shifting the crop too much we'll attempt to evenly move both sides as long as
+    # that won't hit the image boundaries:
+
+    if target_aspect_ratio >= 1.0:
+        scale = original_height / new_crop_height
+    else:
+        scale = original_width / new_crop_width
+
+    logging.info('Original crop box: %r (%0.4f)', cropbox, target_aspect_ratio)
+
+    delta_y = (original_height / scale) - new_crop_height
+    delta_x = (original_width / scale) - new_crop_width
+
+    logging.debug('Crop box deltas: %0.1f x, %0.1f y', delta_x, delta_y)
+
+    if delta_y != 0:
+        cropbox[0] = clamp_values(delta=delta_y, max_value=max_height, *cropbox[0])
+
+    if delta_x != 0:
+        cropbox[1] = clamp_values(delta=delta_x, max_value=max_width, *cropbox[1])
+
+    logging.info('Updated crop box: %r (%0.4f)', cropbox,
+                 (cropbox[0][1] - cropbox[0][0]) / (cropbox[1][1] - cropbox[1][0]))
+
+    return cropbox
+
+
+def clamp_values(low_value, high_value, delta, min_value=0, max_value=0):
+    if delta == 0.0:
+        return low_value, high_value
+
+    top_pad = bottom_pad = delta / 2
+
+    if delta > 0:
+        # We'll shift the box to avoid hitting an image edge:
+        top_pad = max(0, top_pad)
+        bottom_pad = delta - top_pad
+
+    low_value = int(round(low_value - top_pad))
+
+    if low_value < min_value:
+        logging.warning('Clamping crop to %f instead of %f', min_value, low_value)
+        bottom_pad += min_value - low_value
+        low_value = min_value
+
+    high_value = int(round(high_value + bottom_pad))
+
+    if high_value > max_value:
+        logging.warning('Clamping crop to %f instead of %f', max_value, high_value)
+        high_value = max_value
+
+    return low_value, high_value
+
+
 def reconstruct_thumbnail(thumbnail_image, source_image, corners, downsize_reconstruction=False,
-                          max_aspect_ratio_delta=0.1):
+                          max_aspect_ratio_delta=0.1, match_aspect_ratio=False):
     logging.info("Reconstructing thumbnail from source image")
 
     thumb_h, thumb_w = thumbnail_image.shape[:2]
     source_h, source_w = source_image.shape[:2]
 
-    corners_x, corners_y = zip(*corners)
+    old_aspect_ratio = thumb_h / thumb_w
 
-    new_thumb_crop = ((min(corners_y), max(corners_y)), (min(corners_x), max(corners_x)))
+    corners_x, corners_y = zip(*corners)
+    new_thumb_crop = [(min(corners_y), max(corners_y)),
+                      (min(corners_x), max(corners_x))]
+
+    if match_aspect_ratio:
+        new_thumb_crop = adjust_crop_aspect_ratio(new_thumb_crop, old_aspect_ratio,
+                                                  original_height=thumb_h,
+                                                  original_width=thumb_w,
+                                                  max_height=source_h, max_width=source_w)
 
     new_thumb = source_image[slice(*new_thumb_crop[0]), slice(*new_thumb_crop[1])]
 
     new_thumb_rotation, new_thumb = autorotate_image(new_thumb, corners)
+
+    if match_aspect_ratio and new_thumb_rotation not in (0, 180):
+        raise NotImplementedError('FIXME: refactor autorotation to work with aspect ratio matching!')
 
     new_thumb_h, new_thumb_w = new_thumb.shape[:2]
 
     if downsize_reconstruction and (new_thumb_h > thumb_h or new_thumb_w > thumb_w):
         new_thumb = fit_image_within(new_thumb, thumb_h, thumb_w)
 
-    old_aspect_ratio = thumbnail_image.shape[0] / thumbnail_image.shape[1]
     new_aspect_ratio = new_thumb.shape[0] / new_thumb.shape[1]
     logging.info('Master dimensions: width=%s, height=%s', source_image.shape[1], source_image.shape[0])
-    logging.info('Thumbnail dimensions: width=%s, height=%s (aspect ratio: %0.3f)',
+    logging.info('Thumbnail dimensions: width=%s, height=%s (aspect ratio: %0.4f)',
                  thumbnail_image.shape[1], thumbnail_image.shape[0],
                  old_aspect_ratio)
-    logging.info('Reconstructed thumb dimensions: width=%s, height=%s (rotation=%d°, aspect ratio: %0.3f)',
+    logging.info('Reconstructed thumb dimensions: width=%s, height=%s (rotation=%d°, aspect ratio: %0.4f)',
                  new_thumb.shape[1], new_thumb.shape[0],
                  new_thumb_rotation, new_aspect_ratio)
+
+    if match_aspect_ratio:
+        scale = thumbnail_image.shape[0] / new_thumb.shape[0]
+        if thumbnail_image.shape[:2] != tuple(int(round(i * scale)) for i in new_thumb.shape[:2]):
+            raise RuntimeError('Unable to match aspect ratios: %0.4f != %0.4f' % (old_aspect_ratio,
+                                                                                  new_aspect_ratio))
 
     if abs(old_aspect_ratio - new_aspect_ratio) > max_aspect_ratio_delta:
         raise RuntimeError('Aspect ratios are significantly different – reconstruction likely failed!')
@@ -215,7 +300,8 @@ def find_homography(kp_pairs):
 
 def locate_thumbnail(thumbnail_filename, source_filename, display=False, save_visualization=False,
                      save_reconstruction=False, reconstruction_format="jpg",
-                     max_aspect_ratio_delta=0.1, minimum_matches=10,
+                     max_aspect_ratio_delta=0.1, match_aspect_ratio=False,
+                     minimum_matches=10,
                      json_output_filename=None, max_master_edge=4096, max_output_edge=2048):
     thumbnail_basename, thumbnail_image = open_image(thumbnail_filename)
     source_basename, source_image = open_image(source_filename)
@@ -244,6 +330,7 @@ def locate_thumbnail(thumbnail_filename, source_filename, display=False, save_vi
         corners = get_scaled_corners(thumbnail_image, source_image, full_source_image, kp_pairs, H)
 
         new_thumbnail, corners, rotation = reconstruct_thumbnail(thumbnail_image, full_source_image, corners,
+                                                                 match_aspect_ratio=match_aspect_ratio,
                                                                  max_aspect_ratio_delta=max_aspect_ratio_delta)
 
         if json_output_filename:
@@ -275,8 +362,9 @@ def locate_thumbnail(thumbnail_filename, source_filename, display=False, save_vi
         if save_reconstruction:
             new_filename = "%s.reconstructed.%s" % (thumbnail_basename, reconstruction_format)
 
-            cv2.imwrite(new_filename, fit_image_within(new_thumbnail, max_output_edge, max_output_edge))
-            logging.info("Saved reconstructed thumbnail %s", new_filename)
+            new_thumb_img = fit_image_within(new_thumbnail, max_output_edge, max_output_edge)
+            cv2.imwrite(new_filename, new_thumb_img)
+            logging.info("Saved reconstructed %s thumbnail %s", new_thumb_img.shape[:2], new_filename)
     else:
         logging.warning("Found only %d matches; skipping reconstruction", len(kp_pairs))
         title = "MATCH FAILED: %d pairs" % len(kp_pairs)
@@ -322,6 +410,8 @@ def main():
     parser.add_argument('--max-aspect-ratio-delta', type=float, default=0.1,
                         help='Raise an error if the reconstructed image\'s aspect ratio differs by more than '
                              'this percentage default %(default)s)')
+    parser.add_argument('--match-aspect-ratio', action='store_true',
+                        help='Adjust the reconstructed crop box to exactly match the original thumbnail')
     parser.add_argument('--display', action="store_true", help="Display match visualization")
     parser.add_argument('--debug', action="store_true", help="Open debugger for errors")
     args = parser.parse_args()
@@ -353,6 +443,7 @@ def main():
                              max_master_edge=args.fit_master_within,
                              max_output_edge=args.fit_output_within,
                              max_aspect_ratio_delta=args.max_aspect_ratio_delta,
+                             match_aspect_ratio=args.match_aspect_ratio,
                              minimum_matches=args.minimum_matches)
         except Exception as e:
             logging.error("Error processing %s %s: %s", thumbnail, source, e)
