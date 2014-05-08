@@ -123,27 +123,27 @@ def adjust_crop_aspect_ratio(cropbox, target_aspect_ratio, original_height=0, or
     new_crop_width = (new_crop_x[1] - new_crop_x[0])
     new_aspect_ratio = new_crop_height / new_crop_width
 
-    # TODO: check pixel coordinates at the output precision level to ignore floating point noise:
-    if target_aspect_ratio == new_aspect_ratio:
+    if abs(target_aspect_ratio - new_aspect_ratio) < 0.001:
         return cropbox
 
     logging.info('Adjusting reconstruction to match original %0.4f aspect ratio', target_aspect_ratio)
+
+    assert original_height < new_crop_height
+    assert original_width < new_crop_width
 
     # The basic idea is that we'll adjust the crop's short axis up or down to match the input aspect
     # ratio. To avoid shifting the crop too much we'll attempt to evenly move both sides as long as
     # that won't hit the image boundaries:
 
-    if target_aspect_ratio >= 1.0:
-        scale = original_height / new_crop_height
-    else:
-        scale = original_width / new_crop_width
+    scale = new_crop_width / original_width
 
     logging.info('Original crop box: %r (%0.4f)', cropbox, new_crop_height / new_crop_width)
+    logging.info('Reconstructed image is %0.2f%% of the original', scale * 100)
 
-    delta_y = (original_height / scale) - new_crop_height
-    delta_x = (original_width / scale) - new_crop_width
+    delta_y = round(original_height * scale) - new_crop_height
+    delta_x = round(original_width * scale) - new_crop_width
 
-    logging.debug('Crop box deltas: %0.1f x, %0.1f y', delta_x, delta_y)
+    logging.info('Crop box needs to change by: %0.1f x, %0.1f y', delta_x, delta_y)
 
     if delta_y != 0:
         new_crop_y = clamp_values(delta=delta_y, max_value=max_height, *cropbox[0])
