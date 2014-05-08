@@ -135,7 +135,10 @@ def adjust_crop_aspect_ratio(cropbox, target_aspect_ratio, original_height=0, or
     # ratio. To avoid shifting the crop too much we'll attempt to evenly move both sides as long as
     # that won't hit the image boundaries:
 
-    scale = new_crop_width / original_width
+    if new_aspect_ratio > 1.0:
+        scale = new_crop_width / original_width
+    else:
+        scale = new_crop_height / original_height
 
     logging.info('Original crop box: %r (%0.4f)', cropbox, new_crop_height / new_crop_width)
     logging.info('Reconstructed image is %0.2f%% of the original', scale * 100)
