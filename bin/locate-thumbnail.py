@@ -54,10 +54,12 @@ def autorotate_image(img, corners):
     # n.b. numpy rot90 rotates 90° counter-clockwise but our terminology is clockwise
     #      so the rotations below aren't actually flippy:
 
+    print(corners_x, corners_y)
+
     if (((min(corners_x[0], corners_x[1]) > max(corners_x[2], corners_x[3]))
          and min(corners_y[1], corners_y[2]) > max(corners_y[0], corners_y[3]))):
         return 270, numpy.rot90(img)
-    elif min(corners_x[0], corners_y[1]) > max(corners_x[2], corners_x[3]):
+    elif min(corners_x[2], corners_x[3]) > max(corners_x[0], corners_x[1]):
         return 90, numpy.rot90(img, 3)
     elif min(corners_x[0], corners_x[3]) > max(corners_x[1], corners_x[2]):
         return 180, cv2.flip(img, -1)
@@ -211,6 +213,7 @@ def reconstruct_thumbnail(thumbnail_image, source_image, corners, downsize_recon
     new_thumb = source_image[slice(*new_thumb_crop[0]), slice(*new_thumb_crop[1])]
 
     new_thumb_rotation, new_thumb = autorotate_image(new_thumb, corners)
+    logging.info('Detected image rotation: %d°', new_thumb_rotation)
 
     if match_aspect_ratio and new_thumb_rotation not in (0, 180):
         raise NotImplementedError('FIXME: refactor autorotation to work with aspect ratio matching!')
