@@ -6,7 +6,9 @@ Attempting to build tools to mine interesting data from large collections of sca
 Current
 -------
 
-* bin/locate-thumbnail: `find the location of a thumbnail in the source image <http://chris.improbable.org/2013/06/30/reconstructing-thumbnails-using-opencv/>`_
+* bin/locate-thumbnail:
+    - `Reconstructing thumbnails using OpenCV: <http://chris.improbable.org/2013/06/30/reconstructing-thumbnails-using-opencv/>`_
+    - `Upgrading Image Thumbnails… Or How to Fill a Large Display Without Your Content Team Quitting <http://blogs.loc.gov/digitalpreservation/2014/08/upgrading-image-thumbnails-or-how-to-fill-a-large-display-without-your-content-team-quitting/>`_
 * bin/extract-figures: `locate interesting non-text elements (images, figures, tables, etc.) on scanned book pages <http://chris.improbable.org/2013/08/31/extracting-images-from-scanned-pages/>`_
 
 Prerequisites
