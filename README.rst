@@ -32,6 +32,6 @@ On Ubuntu 12.04 Precise the following is known to work - note the need for a PPA
 Discussion
 ----------
 
-.. image:: https://badges.gitter.im/Join Chat.svg
+.. image:: https://badges.gitter.im/Join%20Chat.svg
     :target: https://gitter.im/acdha/image-mining?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
     :alt: Join Chat on Gitter.im
